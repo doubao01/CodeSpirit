@@ -17,3 +17,5 @@ CSP010 | CodeSpirit | Warning | Duplicate binding name in ViewModel
 CSP011 | CodeSpirit | Warning | Command name uses reserved prefix
 CSP012 | CodeSpirit | Warning | Async void command method
 CSP013 | CodeSpirit | Info | ViewModel missing [PageDirective]
+CSP014 | CodeSpirit | Warning | Invalid command return type
+CSP015 | CodeSpirit | Warning | [PageDirective] class does not inherit ViewModel

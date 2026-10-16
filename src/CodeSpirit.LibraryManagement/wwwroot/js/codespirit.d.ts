@@ -58,6 +58,18 @@ interface CodespiritFieldRules {
   pattern?: RegExp | string;
   /** Email address format validation */
   email?: boolean;
+  /** URL format validation */
+  url?: boolean;
+  /** Numeric value validation (integer or decimal) */
+  numeric?: boolean;
+  /** Integer value validation */
+  integer?: boolean;
+  /** Phone number validation */
+  phone?: boolean;
+  /** Phone number validation alias */
+  tel?: boolean;
+  /** Cross-field matching rule, comparing value with another field */
+  matches?: string;
   /** Minimum numeric value */
   min?: number;
   /** Maximum numeric value */
@@ -66,6 +78,8 @@ interface CodespiritFieldRules {
   custom?: (value: unknown, field: string) => boolean | string;
   /** Custom error message overriding defaults */
   message?: string;
+  /** Arbitrary custom validator rules */
+  [customRule: string]: unknown;
 }
 
 /**
@@ -572,6 +586,17 @@ interface CodeSpiritNamespace {
    * Prefer using CodeSpirit.vm() for creating instances.
    */
   VmChain: { new(root: HTMLElement): VmChain };
+
+  /**
+   * Register a custom validator rule globally.
+   *
+   * @param name - The validator rule name
+   * @param validator - The validation callback
+   */
+  registerValidator(name: string, validator: (value: unknown, ruleParam: unknown, field: string, chain: VmChain) => boolean | string): void;
+
+  /** Registry of custom validator functions */
+  validators: Record<string, Function>;
 
   // -- Sub-namespaces --
 

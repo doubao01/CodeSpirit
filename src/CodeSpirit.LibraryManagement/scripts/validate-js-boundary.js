@@ -1274,6 +1274,65 @@ async function main() {
   assert.ok(token.classList.contains('cs-invalid'));
   context.window.CodeSpirit.clearErrors(form);
 
+  // ---- New validation rules (url, numeric, integer, phone, matches) ----
+  var webInput = form.appendChild(new Element('input', { name: 'Website' }));
+  var countInput = form.appendChild(new Element('input', { name: 'Count' }));
+  var telInput = form.appendChild(new Element('input', { name: 'Phone' }));
+  var confirmCity = form.appendChild(new Element('input', { name: 'ConfirmCity' }));
+
+  chain3.set('Website', 'not_a_valid_url');
+  valid = chain3.validate({ Website: { url: true } });
+  assert.strictEqual(valid, false);
+  chain3.set('Website', 'https://example.com');
+  valid = chain3.validate({ Website: { url: true } });
+  assert.strictEqual(valid, true);
+
+  chain3.set('Count', '3.14');
+  valid = chain3.validate({ Count: { integer: true } });
+  assert.strictEqual(valid, false);
+  chain3.set('Count', '42');
+  valid = chain3.validate({ Count: { integer: true, numeric: true } });
+  assert.strictEqual(valid, true);
+
+  chain3.set('Phone', 'not-a-phone');
+  valid = chain3.validate({ Phone: { phone: true } });
+  assert.strictEqual(valid, false);
+  chain3.set('Phone', '+86-13800138000');
+  valid = chain3.validate({ Phone: { phone: true } });
+  assert.strictEqual(valid, true);
+
+  chain3.set('City', 'Tokyo');
+  chain3.set('ConfirmCity', 'Kyoto');
+  valid = chain3.validate({ ConfirmCity: { matches: 'City' } });
+  assert.strictEqual(valid, false);
+  chain3.set('ConfirmCity', 'Tokyo');
+  valid = chain3.validate({ ConfirmCity: { matches: 'City' } });
+  assert.strictEqual(valid, true);
+  context.window.CodeSpirit.clearErrors(form);
+
+  // ---- Global validator registry ----
+  assert.strictEqual(typeof context.window.CodeSpirit.registerValidator, 'function');
+  context.window.CodeSpirit.registerValidator('even', function (val) {
+    return parseInt(val, 10) % 2 === 0 || 'Must be even';
+  });
+  chain3.set('Count', '3');
+  valid = chain3.validate({ Count: { even: true } });
+  assert.strictEqual(valid, false);
+  chain3.set('Count', '4');
+  valid = chain3.validate({ Count: { even: true } });
+  assert.strictEqual(valid, true);
+  context.window.CodeSpirit.clearErrors(form);
+
+  // ---- Loading button and debounce attribute checks ----
+  var loadingBtn = form.appendChild(new Element('button', {
+    type: 'submit',
+    'data-cs-command': 'Save',
+    'data-cs-loading': 'true',
+    'data-cs-debounce': '300'
+  }));
+  assert.strictEqual(loadingBtn.getAttribute('data-cs-loading'), 'true');
+  assert.strictEqual(loadingBtn.getAttribute('data-cs-debounce'), '300');
+
   runScript('wwwroot/js/ui/codespirit.intent.js', context);
   context.CodeSpirit = context.window.CodeSpirit;
   runScript('wwwroot/js/tests/runtime.test.js', context);

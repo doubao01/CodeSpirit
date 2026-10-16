@@ -31,6 +31,7 @@ CodeSpirit.LibraryManagement/
 - 领域模型和服务放在能力目录，例如 `Features/Library`。
 - 框架约定文件保留在根目录：`Pages`、`Components`、`Reports`、`wwwroot`。
 - ASPX 只描述标记结构，路由和标题放在 ViewModel 的 `PageDirective`。
+- ASPX 渲染支持嵌套绑定路径、列表索引和 `<cs:Repeater>` 内继续使用 CodeSpirit 组件。
 - 默认布局 `Pages/Site.master` 使用 `<cs:Scripts />` 加载内置前端工具链。
 
 ## 内置页面标签
@@ -64,9 +65,27 @@ CodeSpirit.LibraryManagement/
 - `jquery-lite.js` 提供本地 jQuery 兼容层。
 - `jquery.behaviors.js` 管理依赖 jQuery 兼容层的 `data-ui` 行为。
 - `ui.behaviors.js` 管理原生渐进增强行为。
-- `codespirit.runtime.js` 管理 `data-cs-*` MVVM 绑定、命令、局部刷新、表达式求值和错误回显。
-- `codespirit.expression.js` 管理 `data-cs-show`、`data-cs-enable`、`data-cs-refresh`、`data-cs-confirm`、`data-cs-source` 表达式引擎。
+- `codespirit.runtime.js` 管理 `data-cs-*` MVVM 绑定、命令、局部刷新、表单控件值、校验和错误回显。
+- `codespirit.expression.js` 管理 `data-cs-show`、`data-cs-enable`、`data-cs-refresh`、`data-cs-confirm`、`data-cs-source`、`data-cs-attr`、`data-cs-visible`、`data-cs-hidden`、`data-cs-enabled`、`data-cs-disabled` 表达式和运行时行为。
 - `codespirit.intent.js` 管理 `data-cs-intent` 和 `data-cs-scene` 识别。
+- Dev Panel 在 `?dev=1` 下支持实时编辑常用 `data-cs-*`、`data-ui`、`class`、`style`、文本和 HTML；`Ctrl/Cmd + Shift + C` 切换页面拾取，`Ctrl/Cmd + S` 同步当前预览到 ASPX。
+
+前端运行时稳定 API：
+
+| API | 用途 |
+|-----|------|
+| `CodeSpirit.vm(root)` | 获取链式 ViewModel 操作对象 |
+| `CodeSpirit.input(element)` | 通知 MVVM 某个控件值已变化 |
+| `CodeSpirit.applyState(root, state)` | 将服务端 state 应用到绑定元素 |
+| `CodeSpirit.applyRegions(root, regions)` | 替换 `data-cs-region` 局部区域 |
+| `CodeSpirit.mount(root)` | 初次初始化 DOM root |
+| `CodeSpirit.refresh(root)` | 动态更新后重新初始化 DOM root |
+| `CodeSpirit.ui.register(name, initializer)` | 注册可复用 `data-ui` 行为 |
+| `CodeSpirit.qs(selector, root)` / `CodeSpirit.qsa(selector, root)` | 查询作用域内单个或多个元素 |
+| `CodeSpirit.on(root, eventName, selector, handler)` | 注册事件委托并返回取消订阅函数 |
+| `CodeSpirit.debounce(fn, wait)` / `CodeSpirit.throttle(fn, wait)` | 防抖和节流高频前端交互 |
+| `CodeSpirit.ready(callback)` | DOM 就绪后执行回调 |
+| `CodeSpirit.state(root)` / `CodeSpirit.set(root, name, value)` / `CodeSpirit.batch(root, changes)` | 读取、写入和批量更新 ViewModel 状态 |
 
 ## 默认样式与场景
 
@@ -135,10 +154,26 @@ ISBN,Title,Author,Category,Location,PublishedYear,CopyCount,Rating
 | `csscripts` | `<cs:Scripts>` 脚本资源容器 |
 | `csstack` | `<cs:Stack>` Flex 堆叠布局 |
 | `csactivity` | `<cs:ActivityFeed>` 活动流 |
+| `cschart` | `<cs:Chart>` 图表组件 |
 | `cstable` | `<cs:Table Columns="Property:Header[:Format]">` 表格简写 |
 | `cstablex` | `<cs:Table>` 含 `<cs:Column>` 子标签显式列定义 |
 | `cstabs` | `<cs:Tabs>` 标签页 |
 | `cstoolbar` | `<cs:Toolbar>` 工具栏 |
+| `cstree` | `<cs:Tree>` 可折叠树形结构组件 |
+| `cswizard` | `<cs:Wizard>` 可点击分步向导组件 |
+
+`wwwroot/js/codespirit.d.ts` 提供前端 TypeScript IntelliSense，覆盖运行时 API、UI 行为、主题、意图、表达式引擎、校验规则以及 `codespirit:tree-toggle`、`codespirit:wizard-step` 事件 detail。
+
+### VS Code JavaScript 快捷方式
+
+| 快捷方式 | 输出 |
+|----------|------|
+| `cs-qs` | `CodeSpirit.qs` / `CodeSpirit.qsa` 作用域查询 |
+| `cs-on` | `CodeSpirit.on` 事件委托 |
+| `cs-batch` | `CodeSpirit.batch` 批量状态更新 |
+| `cs-vm-chain` | `CodeSpirit.vm(root)` 链式调用 |
+| `cs-tree-event` | `codespirit:tree-toggle` 事件监听 |
+| `cs-wizard-event` | `codespirit:wizard-step` 事件监听 |
 
 ## 无人值守开发
 

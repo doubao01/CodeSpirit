@@ -168,6 +168,8 @@ public class ViewModelExecutor
         var result = command.Method.Invoke(vm, null);
         if (result is Task task)
             await task;
+        else if (result is ValueTask valueTask)
+            await valueTask;
     }
 
     private static string? GetCommandName(HttpContext ctx, Dictionary<string, object?> payload)

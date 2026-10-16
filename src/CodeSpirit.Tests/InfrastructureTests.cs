@@ -317,6 +317,19 @@ public class PageParserTests
 
         Assert.Null(descriptor);
     }
+
+    [Fact]
+    public void ParseFromFile_WithPrecedingCommentOrDirective_ParsesPageDirective()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"codespirit-page-{Guid.NewGuid():N}.aspx");
+        File.WriteAllText(filePath, "<!-- Comment --><%@ Import Namespace=\"System\" %><%@ Page Route=\"/profile\" Title=\"User Profile\" %>");
+
+        var descriptor = new PageParser().ParseFromFile(filePath);
+
+        Assert.NotNull(descriptor);
+        Assert.Equal("/profile", descriptor.Route);
+        Assert.Equal("User Profile", descriptor.Title);
+    }
 }
 
 public class PageRendererTagTests
@@ -460,6 +473,73 @@ public class PageRendererTagTests
             new Dictionary<string, object?>());
 
         Assert.Contains("<form method=\"post\" data-cs-vm>", html);
+    }
+
+    [Fact]
+    public void Button_WithSingleQuotesAndCustomClass_RendersCorrectly()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Button Command='Save' class='btn-success'>Save Item</cs:Button>",
+            new Dictionary<string, object?>());
+
+        Assert.Contains("data-cs-command=\"Save\"", html);
+        Assert.Contains("class=\"btn-success\"", html);
+        Assert.Contains("Save Item", html);
+    }
+
+    [Fact]
+    public void Conditional_WithSingleQuotesAndVisibleBinding_RendersCorrectly()
+    {
+        var htmlTrue = PageRenderer.RenderTemplateForTests(
+            "<cs:Conditional Visible='{Binding HasData}'><span>Has Content</span></cs:Conditional>",
+            new Dictionary<string, object?> { ["HasData"] = true });
+
+        Assert.Contains("<span>Has Content</span>", htmlTrue);
+
+        var htmlFalse = PageRenderer.RenderTemplateForTests(
+            "<cs:Conditional Visible='{Binding HasData}'><span>Has Content</span></cs:Conditional>",
+            new Dictionary<string, object?> { ["HasData"] = false });
+
+        Assert.DoesNotContain("<span>Has Content</span>", htmlFalse);
+    }
+
+    [Fact]
+    public void Repeater_WithSingleQuotes_RendersCorrectly()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Repeater Items='{Binding Items}'><span>{Binding Name}</span></cs:Repeater>",
+            new Dictionary<string, object?>
+            {
+                ["Items"] = new[] { new { Name = "Alpha" }, new { Name = "Beta" } }
+            });
+
+        Assert.Contains("<span>Alpha</span>", html);
+        Assert.Contains("<span>Beta</span>", html);
+    }
+
+    [Fact]
+    public void Field_SelectWithOptions_RendersSelectOptions()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Field Name='Role' Type='select' Options='admin:Administrator,user:Standard User' Placeholder='Choose a role' />",
+            new Dictionary<string, object?> { ["Role"] = "admin" });
+
+        Assert.Contains("<select id=\"Role\" name=\"Role\" data-cs-bind=\"Role\">", html);
+        Assert.Contains("<option value=\"\">Choose a role</option>", html);
+        Assert.Contains("<option value=\"admin\" selected>Administrator</option>", html);
+        Assert.Contains("<option value=\"user\">Standard User</option>", html);
+    }
+
+    [Fact]
+    public void Field_CheckboxType_RendersCheckbox()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Field Name='IsActive' Type='checkbox' Label='Active Status' />",
+            new Dictionary<string, object?> { ["IsActive"] = true });
+
+        Assert.Contains("type=\"checkbox\"", html);
+        Assert.Contains("checked", html);
+        Assert.Contains("Active Status", html);
     }
 
     [Fact]
@@ -1133,6 +1213,34 @@ public class ViewModelExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_PostJson_ExecutesAndAwaitsValueTaskCommand()
+    {
+        var ctx = CreateContext("POST", "{\"Value\":5,\"__command\":\"IncrementValueTask\"}");
+        var executor = CreateExecutor(ctx.RequestServices);
+
+        await executor.ExecuteAsync(ctx, typeof(ExecutorAsyncCommandViewModel));
+
+        var response = await ReadJsonResponse(ctx);
+
+        Assert.Equal(200, ctx.Response.StatusCode);
+        Assert.Equal(15, response.RootElement.GetProperty("state").GetProperty("Value").GetInt32());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PostJson_ExecutesAndAwaitsTaskCommand()
+    {
+        var ctx = CreateContext("POST", "{\"Value\":5,\"__command\":\"IncrementTask\"}");
+        var executor = CreateExecutor(ctx.RequestServices);
+
+        await executor.ExecuteAsync(ctx, typeof(ExecutorAsyncCommandViewModel));
+
+        var response = await ReadJsonResponse(ctx);
+
+        Assert.Equal(200, ctx.Response.StatusCode);
+        Assert.Equal(10, response.RootElement.GetProperty("state").GetProperty("Value").GetInt32());
+    }
+
+    [Fact]
     public async Task ExecuteAsync_PostJson_UnknownCommand_ReturnsJsonError()
     {
         var ctx = CreateContext("POST", "{\"__command\":\"Missing\"}");
@@ -1203,6 +1311,104 @@ public class ViewModelExecutorTests
         Assert.Contains("RouteId: 42", html);
     }
 
+    [Fact]
+    public void Button_SelfClosingWithTextAttribute_RendersCorrectly()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Button Command=\"Save\" Text=\"Save Book\" />",
+            new Dictionary<string, object?>());
+
+        Assert.Contains("data-cs-command=\"Save\"", html);
+        Assert.Contains(">Save Book</button>", html);
+    }
+
+    [Fact]
+    public void Link_SelfClosingWithTextAttribute_RendersCorrectly()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Link NavigateTo=\"/books\" Text=\"All Books\" />",
+            new Dictionary<string, object?>());
+
+        Assert.Contains("href=\"/books\"", html);
+        Assert.Contains(">All Books</a>", html);
+    }
+
+    [Fact]
+    public void Form_WithDebounceAndLoading_RendersDataAttributes()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Form Debounce=\"500\" Loading=\"true\"><input type=\"text\" /></cs:Form>",
+            new Dictionary<string, object?>());
+
+        Assert.Contains("data-cs-debounce=\"500\"", html);
+        Assert.Contains("data-cs-loading=\"true\"", html);
+        Assert.Contains("data-cs-vm", html);
+    }
+
+    [Fact]
+    public void Button_WithDebounceAndLoading_RendersDataAttributes()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Button Command=\"Save\" Loading=\"true\" Debounce=\"300\">Save</cs:Button>",
+            new Dictionary<string, object?>());
+
+        Assert.Contains("data-cs-command=\"Save\"", html);
+        Assert.Contains("data-cs-loading=\"true\"", html);
+        Assert.Contains("data-cs-debounce=\"300\"", html);
+    }
+
+    [Fact]
+    public void CustomTagRenderer_BlockAndSelfClosing_RendersOutput()
+    {
+        try
+        {
+            PageRenderer.RegisterTagRenderer(new TestBadgeTagRenderer());
+            PageRenderer.RegisterTagRenderer(new TestAlertTagRenderer());
+
+            var selfClosingHtml = PageRenderer.RenderTemplateForTests(
+                "<cs:Badge Text=\"New\" Type=\"success\" />",
+                new Dictionary<string, object?>());
+
+            Assert.Contains("<span class=\"badge badge-success\">New</span>", selfClosingHtml);
+
+            var blockHtml = PageRenderer.RenderTemplateForTests(
+                "<cs:Alert Type=\"warning\"><strong>Warning:</strong> Low stock</cs:Alert>",
+                new Dictionary<string, object?>());
+
+            Assert.Contains("<div class=\"alert alert-warning\"><strong>Warning:</strong> Low stock</div>", blockHtml);
+        }
+        finally
+        {
+            PageRenderer.UnregisterTagRenderer("Badge");
+            PageRenderer.UnregisterTagRenderer("Alert");
+        }
+    }
+
+    private sealed class TestBadgeTagRenderer : ITagRenderer
+    {
+        public string TagName => "Badge";
+        public bool IsSelfClosing => true;
+
+        public string Render(string rawAttributes, string innerContent, IReadOnlyDictionary<string, object?> state)
+        {
+            var text = PageRenderer.GetAttribute(rawAttributes, "Text") ?? string.Empty;
+            var type = PageRenderer.GetAttribute(rawAttributes, "Type") ?? "default";
+            return $"<span class=\"badge badge-{type}\">{text}</span>";
+        }
+    }
+
+    private sealed class TestAlertTagRenderer : ITagRenderer
+    {
+        public string TagName => "Alert";
+        public bool IsSelfClosing => false;
+
+        public string Render(string rawAttributes, string innerContent, IReadOnlyDictionary<string, object?> state)
+        {
+            var type = PageRenderer.GetAttribute(rawAttributes, "Type") ?? "info";
+            return $"<div class=\"alert alert-{type}\">{innerContent}</div>";
+        }
+    }
+
     private static void EnsureTestPage(string fileName, string content)
     {
         var pagesDir = Path.Combine(AppContext.BaseDirectory, "Pages");
@@ -1216,6 +1422,7 @@ public class ViewModelExecutorTests
         services.AddScoped<ExecutorTestViewModel>();
         services.AddScoped<ExecutorQueryRouteViewModel>();
         services.AddScoped<UnsafeTitleViewModel>();
+        services.AddScoped<ExecutorAsyncCommandViewModel>();
         var provider = services.BuildServiceProvider();
 
         var ctx = new DefaultHttpContext { RequestServices = provider };
@@ -1275,5 +1482,26 @@ public class ViewModelExecutorTests
     {
         [CodeSpirit.Core.Mvvm.Bind]
         public string Message { get; set; } = "safe";
+    }
+
+    [CodeSpirit.Core.Page.PageDirective(Title = "Async Command Test")]
+    private sealed class ExecutorAsyncCommandViewModel : CodeSpirit.Core.ViewModel
+    {
+        [CodeSpirit.Core.Mvvm.Bind(CodeSpirit.Core.Mvvm.BindDirection.TwoWay)]
+        public int Value { get; set; }
+
+        [CodeSpirit.Core.Mvvm.Command]
+        public async ValueTask IncrementValueTask()
+        {
+            await Task.Yield();
+            Value += 10;
+        }
+
+        [CodeSpirit.Core.Mvvm.Command]
+        public async Task IncrementTask()
+        {
+            await Task.Yield();
+            Value += 5;
+        }
     }
 }

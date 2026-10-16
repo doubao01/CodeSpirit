@@ -125,6 +125,22 @@ public class CodeSpiritServiceGenerator : IIncrementalGenerator
         DiagnosticSeverity.Info,
         isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor InvalidCommandReturnTypeWarning = new(
+        "CSP014",
+        "Invalid command return type",
+        "Command method '{0}' returns '{1}'. Command methods should return void, Task, or ValueTask.",
+        "CodeSpirit",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor PageDirectiveWithoutViewModelWarning = new(
+        "CSP015",
+        "[PageDirective] class does not inherit ViewModel",
+        "Class '{0}' has [PageDirective] but does not inherit from ViewModel. Page routing requires the ViewModel base class.",
+        "CodeSpirit",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var classDeclarations = context.SyntaxProvider
@@ -177,6 +193,22 @@ public class CodeSpiritServiceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(commandMethods.Collect(), GenerateCommandAccessibilityDiagnostics);
 
+        var asyncVoidCommands = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                predicate: static (node, _) => node is MethodDeclarationSyntax m && m.AttributeLists.Count > 0 && m.Modifiers.Any(mod => mod.ValueText == "async"),
+                transform: static (ctx, _) => GetAsyncVoidCommandInfo(ctx))
+            .Where(static info => info is not null);
+
+        context.RegisterSourceOutput(asyncVoidCommands.Collect(), GenerateAsyncVoidCommandDiagnostics);
+
+        var commandReturnTypes = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                predicate: static (node, _) => node is MethodDeclarationSyntax m && m.AttributeLists.Count > 0,
+                transform: static (ctx, _) => GetCommandReturnTypeInfo(ctx))
+            .Where(static info => info is not null);
+
+        context.RegisterSourceOutput(commandReturnTypes.Collect(), GenerateCommandReturnTypeDiagnostics);
+
         // Additional diagnostics for ViewModel validation
         var viewModelClasses = context.SyntaxProvider
             .CreateSyntaxProvider(
@@ -185,6 +217,14 @@ public class CodeSpiritServiceGenerator : IIncrementalGenerator
             .Where(static info => info is not null);
 
         context.RegisterSourceOutput(viewModelClasses.Collect(), GenerateViewModelValidationDiagnostics);
+
+        var pageDirectiveClasses = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                predicate: static (node, _) => node is ClassDeclarationSyntax c && c.AttributeLists.Count > 0,
+                transform: static (ctx, _) => GetPageDirectiveValidationInfo(ctx))
+            .Where(static info => info is not null);
+
+        context.RegisterSourceOutput(pageDirectiveClasses.Collect(), GeneratePageDirectiveDiagnostics);
     }
 
     private static ServiceRegistrationInfo? GetServiceRegistrationInfo(GeneratorSyntaxContext ctx)
@@ -372,7 +412,14 @@ public class CodeSpiritServiceGenerator : IIncrementalGenerator
                 _ => "Scoped"
             };
 
-            sb.AppendLine($"            services.Add{lifetimeStr}<{reg.InterfaceName}, {reg.ClassName}>();");
+            if (reg.InterfaceName == reg.ClassName)
+            {
+                sb.AppendLine($"            services.Add{lifetimeStr}<{reg.ClassName}>();");
+            }
+            else
+            {
+                sb.AppendLine($"            services.Add{lifetimeStr}<{reg.InterfaceName}, {reg.ClassName}>();");
+            }
         }
 
         sb.AppendLine("        }");
@@ -532,6 +579,82 @@ public class CodeSpiritServiceGenerator : IIncrementalGenerator
         }
     }
 
+    private static PropertyDiagnosticInfo? GetAsyncVoidCommandInfo(GeneratorSyntaxContext ctx)
+    {
+        var methodDecl = (MethodDeclarationSyntax)ctx.Node;
+        var symbol = ctx.SemanticModel.GetDeclaredSymbol(methodDecl);
+        if (symbol is not IMethodSymbol methodSymbol)
+            return null;
+
+        if (!methodSymbol.IsAsync || !methodSymbol.ReturnsVoid)
+            return null;
+
+        var hasCommand = methodSymbol.GetAttributes().Any(a =>
+            a.AttributeClass?.ToDisplayString() == CommandAttributeName);
+
+        if (!hasCommand)
+            return null;
+
+        return new PropertyDiagnosticInfo
+        {
+            MemberName = methodSymbol.Name,
+            AttributeName = "async void",
+            Location = methodSymbol.Locations.FirstOrDefault()
+        };
+    }
+
+    private static void GenerateAsyncVoidCommandDiagnostics(
+        SourceProductionContext context,
+        ImmutableArray<PropertyDiagnosticInfo?> infos)
+    {
+        foreach (var info in infos)
+        {
+            if (info?.Location is not null)
+                context.ReportDiagnostic(Diagnostic.Create(
+                    AsyncVoidCommandWarning, info.Location, info.MemberName));
+        }
+    }
+
+    private static PropertyDiagnosticInfo? GetCommandReturnTypeInfo(GeneratorSyntaxContext ctx)
+    {
+        var methodDecl = (MethodDeclarationSyntax)ctx.Node;
+        var symbol = ctx.SemanticModel.GetDeclaredSymbol(methodDecl);
+        if (symbol is not IMethodSymbol methodSymbol)
+            return null;
+
+        var hasCommand = methodSymbol.GetAttributes().Any(a =>
+            a.AttributeClass?.ToDisplayString() == CommandAttributeName);
+
+        if (!hasCommand)
+            return null;
+
+        if (methodSymbol.ReturnsVoid)
+            return null;
+
+        var returnTypeStr = methodSymbol.ReturnType.ToDisplayString();
+        if (returnTypeStr is "System.Threading.Tasks.Task" or "System.Threading.Tasks.ValueTask")
+            return null;
+
+        return new PropertyDiagnosticInfo
+        {
+            MemberName = methodSymbol.Name,
+            AttributeName = returnTypeStr,
+            Location = methodSymbol.Locations.FirstOrDefault()
+        };
+    }
+
+    private static void GenerateCommandReturnTypeDiagnostics(
+        SourceProductionContext context,
+        ImmutableArray<PropertyDiagnosticInfo?> infos)
+    {
+        foreach (var info in infos)
+        {
+            if (info?.Location is not null)
+                context.ReportDiagnostic(Diagnostic.Create(
+                    InvalidCommandReturnTypeWarning, info.Location, info.MemberName, info.AttributeName));
+        }
+    }
+
     private static ViewModelValidationInfo? GetViewModelValidationInfo(GeneratorSyntaxContext ctx)
     {
         var classDecl = (ClassDeclarationSyntax)ctx.Node;
@@ -542,19 +665,7 @@ public class CodeSpiritServiceGenerator : IIncrementalGenerator
             return null;
 
         // Check if it inherits from ViewModel
-        var baseType = typeSymbol.BaseType;
-        var isViewModel = false;
-        while (baseType != null)
-        {
-            if (baseType.Name == "ViewModel" && baseType.ContainingNamespace?.ToDisplayString().Contains("CodeSpirit") == true)
-            {
-                isViewModel = true;
-                break;
-            }
-            baseType = baseType.BaseType;
-        }
-
-        if (!isViewModel)
+        if (!InheritsViewModel(typeSymbol))
             return null;
 
         var commands = new List<string>();
@@ -580,7 +691,9 @@ public class CodeSpiritServiceGenerator : IIncrementalGenerator
                 {
                     if (attr.AttributeClass?.ToDisplayString() == CommandAttributeName)
                     {
-                        var commandName = attr.ConstructorArguments.FirstOrDefault().Value?.ToString() ?? method.Name;
+                        var customName = (attr.ConstructorArguments.FirstOrDefault().Value as string)
+                            ?? (attr.NamedArguments.FirstOrDefault(na => na.Key == "Name").Value.Value as string);
+                        var commandName = !string.IsNullOrWhiteSpace(customName) ? customName! : method.Name;
                         commands.Add(commandName);
                     }
                 }
@@ -591,7 +704,8 @@ public class CodeSpiritServiceGenerator : IIncrementalGenerator
                 {
                     if (attr.AttributeClass?.ToDisplayString() == BindAttributeName)
                     {
-                        var bindName = attr.ConstructorArguments.FirstOrDefault().Value?.ToString() ?? prop.Name;
+                        var customName = attr.NamedArguments.FirstOrDefault(na => na.Key == "Name").Value.Value as string;
+                        var bindName = !string.IsNullOrWhiteSpace(customName) ? customName! : prop.Name;
                         bindings.Add(bindName);
                     }
                 }
@@ -657,6 +771,64 @@ public class CodeSpiritServiceGenerator : IIncrementalGenerator
             }
         }
     }
+
+    private static bool InheritsViewModel(INamedTypeSymbol typeSymbol)
+    {
+        var baseType = typeSymbol.BaseType;
+        while (baseType != null)
+        {
+            if (baseType.Name == "ViewModel" &&
+                baseType.ContainingNamespace?.ToDisplayString().Contains("CodeSpirit") == true)
+            {
+                return true;
+            }
+
+            baseType = baseType.BaseType;
+        }
+
+        return false;
+    }
+
+    private static PageDirectiveValidationInfo? GetPageDirectiveValidationInfo(GeneratorSyntaxContext ctx)
+    {
+        var classDecl = (ClassDeclarationSyntax)ctx.Node;
+        var symbol = ctx.SemanticModel.GetDeclaredSymbol(classDecl);
+
+        if (symbol is not INamedTypeSymbol typeSymbol)
+            return null;
+
+        var hasPageDirective = typeSymbol.GetAttributes()
+            .Any(static attr => attr.AttributeClass?.Name == "PageDirectiveAttribute");
+
+        if (!hasPageDirective || InheritsViewModel(typeSymbol))
+            return null;
+
+        return new PageDirectiveValidationInfo
+        {
+            ClassName = typeSymbol.Name,
+            Location = typeSymbol.Locations.FirstOrDefault()
+        };
+    }
+
+    private static void GeneratePageDirectiveDiagnostics(
+        SourceProductionContext context,
+        ImmutableArray<PageDirectiveValidationInfo?> infos)
+    {
+        foreach (var info in infos)
+        {
+            if (info?.Location is null)
+                continue;
+
+            context.ReportDiagnostic(Diagnostic.Create(
+                PageDirectiveWithoutViewModelWarning, info.Location, info.ClassName));
+        }
+    }
+}
+
+internal sealed class PageDirectiveValidationInfo
+{
+    public string ClassName { get; set; } = string.Empty;
+    public Location? Location { get; set; }
 }
 
 internal sealed class ServiceRegistrationInfo

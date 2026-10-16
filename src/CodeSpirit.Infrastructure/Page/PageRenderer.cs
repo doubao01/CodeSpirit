@@ -24,23 +24,16 @@ public class PageRenderer
     private static Regex SelfClosing(string tag) => new(
         $@"<cs:{tag}\b(?<attrs>[^>]*)\s*/>", DefaultOptions);
 
-    private static readonly Regex ContentRegex = new(
-        @"<cs:Content\s+PlaceHolder=\""(?<name>[^\"" ]+)\""\s*>(?<content>.*?)</cs:Content>",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-    private static readonly Regex RepeaterRegex = new(
-        @"<cs:Repeater\s+Items=\""\{Binding\s+(?<name>[^}:]+)\}\""\s*>(?<content>.*?)</cs:Repeater>",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-    private static readonly Regex ConditionalRegex = new(
-        @"<cs:Conditional\s+Visible=\""\{Binding\s+(?<name>[^}:]+)\}\""\s*>(?<content>.*?)</cs:Conditional>",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-    private static readonly Regex LinkRegex = new(
-        @"<cs:Link\s+NavigateTo=\""(?<href>[^\"" ]+)\""\s*>(?<content>.*?)</cs:Link>",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+    private static readonly Regex ContentRegex = TagBlock("Content");
+    private static readonly Regex RepeaterRegex = TagBlock("Repeater");
+    private static readonly Regex ConditionalRegex = TagBlock("Conditional");
+    private static readonly Regex LinkRegex = TagBlock("Link");
+    private static readonly Regex LinkSelfRegex = SelfClosing("Link");
     private static readonly Regex FormRegex = TagBlock("Form");
     private static readonly Regex RegionRegex = TagBlock("Region");
-    private static readonly Regex ButtonRegex = new(
-        @"<cs:Button\s+Command=\""(?<command>[^\"" ]+)\""(?<attrs>[^>]*)>(?<content>.*?)</cs:Button>",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+    private static readonly Regex ButtonRegex = TagBlock("Button");
+    private static readonly Regex ButtonSelfRegex = SelfClosing("Button");
+    private static readonly Regex PlaceHolderRegex = SelfClosing("PlaceHolder");
     private static readonly Regex ShowRegex = new(
         @"<cs:Show(?<attrs>[^>]*)\s*>(?<content>.*?)</cs:Show>",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
@@ -70,7 +63,7 @@ public class PageRenderer
     private static readonly Regex WizardRegex = TagBlock("Wizard");
     private static readonly Regex StepRegex = TagBlock("Step");
     private static readonly Regex AttributeRegex = new(
-        @"(?<name>[A-Za-z][A-Za-z0-9_-]*)=\""(?<value>[^\""]*)\""",
+        @"(?<name>[A-Za-z][A-Za-z0-9_-]*)\s*=\s*(?:""(?<value>[^""]*)""|'(?<value>[^']*)')",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex PathIndexRegex = new(
         @"\[(?<index>\d+)\]",
@@ -95,9 +88,25 @@ public class PageRenderer
 
     private static readonly ConcurrentDictionary<(string Template, string StateJson), string> _renderCache = new();
     private static readonly ConcurrentDictionary<string, PathSegment[]> _pathCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, ITagRenderer> _customTagRenderers = new(StringComparer.OrdinalIgnoreCase);
     private static long _renderCacheHits;
     private static long _renderCacheMisses;
     private const int MaxRenderCacheEntries = 512;
+
+    public static void RegisterTagRenderer(ITagRenderer renderer)
+    {
+        _customTagRenderers[renderer.TagName] = renderer;
+    }
+
+    public static bool UnregisterTagRenderer(string tagName)
+    {
+        return _customTagRenderers.TryRemove(tagName, out _);
+    }
+
+    public static void ClearTagRenderers()
+    {
+        _customTagRenderers.Clear();
+    }
 
     public PageRenderer(PageParser parser, ILogger<PageRenderer> logger)
     {
@@ -144,17 +153,31 @@ public class PageRenderer
 
         var page = ReadPageContent(pagePath);
         var sections = ContentRegex.Matches(page)
-            .ToDictionary(match => match.Groups["name"].Value, match => match.Groups["content"].Value, StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(
+                match => GetAttribute(match.Groups["attrs"].Value, "PlaceHolder") ?? match.Groups["name"].Value,
+                match => match.Groups["content"].Value,
+                StringComparer.OrdinalIgnoreCase);
 
         var body = sections.GetValueOrDefault("Body", page);
         var head = sections.GetValueOrDefault("Head", string.Empty);
         var scripts = sections.GetValueOrDefault("Scripts", string.Empty);
 
-        var html = ResolveLayout(httpContext, layout) is { } layoutPath
+        var layoutTemplate = ResolveLayout(httpContext, layout) is { } layoutPath
             ? ReadPageContent(layoutPath)
-                .Replace("<cs:PlaceHolder Name=\"Head\" />", head)
-                .Replace("<cs:PlaceHolder Name=\"Body\" />", body)
-                .Replace("<cs:PlaceHolder Name=\"Scripts\" />", scripts)
+            : null;
+
+        var html = layoutTemplate is not null
+            ? PlaceHolderRegex.Replace(layoutTemplate, match =>
+            {
+                var name = GetAttribute(match.Groups["attrs"].Value, "Name") ?? string.Empty;
+                return name switch
+                {
+                    _ when string.Equals(name, "Head", StringComparison.OrdinalIgnoreCase) => head,
+                    _ when string.Equals(name, "Body", StringComparison.OrdinalIgnoreCase) => body,
+                    _ when string.Equals(name, "Scripts", StringComparison.OrdinalIgnoreCase) => scripts,
+                    _ => sections.GetValueOrDefault(name, string.Empty)
+                };
+            })
             : body;
 
         return RenderTemplate(html, state);
@@ -180,11 +203,24 @@ public class PageRenderer
     private static string RenderTemplateCore(string template, IReadOnlyDictionary<string, object?> state)
     {
         var html = ConditionalRegex.Replace(template, match =>
-            IsTruthy(GetValue(state, match.Groups["name"].Value)) ? match.Groups["content"].Value : string.Empty);
+        {
+            var rawAttrs = match.Groups["attrs"].Value;
+            var visibleBinding = GetAttribute(rawAttrs, "Visible") ?? match.Groups["name"].Value;
+            var name = ExtractBindingName(visibleBinding);
+            if (string.IsNullOrWhiteSpace(name))
+                return string.Empty;
+            return IsTruthy(GetValue(state, name)) ? match.Groups["content"].Value : string.Empty;
+        });
 
         html = RepeaterRegex.Replace(html, match =>
         {
-            var value = GetValue(state, match.Groups["name"].Value);
+            var rawAttrs = match.Groups["attrs"].Value;
+            var itemsBinding = GetAttribute(rawAttrs, "Items") ?? match.Groups["name"].Value;
+            var name = ExtractBindingName(itemsBinding);
+            if (string.IsNullOrWhiteSpace(name))
+                return string.Empty;
+
+            var value = GetValue(state, name);
             if (value is not System.Collections.IEnumerable items || value is string)
                 return string.Empty;
 
@@ -197,26 +233,59 @@ public class PageRenderer
             return sb.ToString();
         });
 
-        html = LinkRegex.Replace(html, match =>
+        string RenderLinkMatch(string rawAttrs, string innerContent)
         {
-            var href = SafeUrl(RenderBindings(match.Groups["href"].Value, state));
-            return $"<a href=\"{Html(href)}\">{match.Groups["content"].Value}</a>";
-        });
+            var hrefAttr = GetAttribute(rawAttrs, "NavigateTo");
+            var href = SafeUrl(RenderBindings(hrefAttr ?? string.Empty, state));
+            var textAttr = GetAttribute(rawAttrs, "Text");
+            var content = !string.IsNullOrEmpty(innerContent)
+                ? innerContent
+                : !string.IsNullOrWhiteSpace(textAttr)
+                    ? Html(RenderBindings(textAttr, state))
+                    : Html(href);
+            var attrs = RenderHtmlAttributes(rawAttrs, state, "NavigateTo", "Text");
+            return $"<a href=\"{Html(href)}\"{attrs}>{content}</a>";
+        }
 
-        html = ButtonRegex.Replace(html, match =>
+        html = LinkRegex.Replace(html, match => RenderLinkMatch(match.Groups["attrs"].Value, match.Groups["content"].Value));
+        html = LinkSelfRegex.Replace(html, match => RenderLinkMatch(match.Groups["attrs"].Value, string.Empty));
+
+        string RenderButtonMatch(string rawAttrs, string innerContent)
         {
-            var command = Html(RenderBindings(match.Groups["command"].Value, state));
-            var rawAttrs = match.Groups["attrs"].Value;
-            var attrs = RenderHtmlAttributes(rawAttrs, state, "Command");
+            var cmdAttr = GetAttribute(rawAttrs, "Command");
+            var command = Html(RenderBindings(cmdAttr ?? string.Empty, state));
+            var textAttr = GetAttribute(rawAttrs, "Text");
+            var content = !string.IsNullOrEmpty(innerContent)
+                ? innerContent
+                : !string.IsNullOrWhiteSpace(textAttr)
+                    ? Html(RenderBindings(textAttr, state))
+                    : command;
+
+            var loading = GetAttribute(rawAttrs, "Loading") ?? GetAttribute(rawAttrs, "AutoDisable");
+            var debounce = GetAttribute(rawAttrs, "Debounce");
+            var extraAttrs = new StringBuilder();
+            if (string.Equals(loading, "true", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(loading))
+            {
+                extraAttrs.Append(" data-cs-loading=\"true\"");
+            }
+            if (!string.IsNullOrWhiteSpace(debounce))
+            {
+                extraAttrs.Append($" data-cs-debounce=\"{Html(debounce)}\"");
+            }
+
+            var attrs = RenderHtmlAttributes(rawAttrs, state, "Command", "Text", "Loading", "AutoDisable", "Debounce");
 
             if (string.IsNullOrWhiteSpace(GetAttribute(rawAttrs, "class")))
             {
-                var btnClass = InferButtonClass(match.Groups["command"].Value);
+                var btnClass = InferButtonClass(cmdAttr ?? string.Empty);
                 attrs = $" class=\"{btnClass}\"{attrs}";
             }
 
-            return $"<button type=\"submit\" data-cs-command=\"{command}\"{attrs}>{match.Groups["content"].Value}</button>";
-        });
+            return $"<button type=\"submit\" data-cs-command=\"{command}\"{extraAttrs}{attrs}>{content}</button>";
+        }
+
+        html = ButtonRegex.Replace(html, match => RenderButtonMatch(match.Groups["attrs"].Value, match.Groups["content"].Value));
+        html = ButtonSelfRegex.Replace(html, match => RenderButtonMatch(match.Groups["attrs"].Value, string.Empty));
 
         html = FieldRegex.Replace(html, match => RenderField(match.Groups["attrs"].Value, state));
 
@@ -266,10 +335,34 @@ public class PageRenderer
 
         html = FormRegex.Replace(html, match =>
         {
-            var attrs = RenderHtmlAttributes(match.Groups["attrs"].Value, state, "Method");
-            var method = SafeFormMethod(GetAttribute(match.Groups["attrs"].Value, "Method"));
-            return $"<form method=\"{Html(method)}\" data-cs-vm{attrs}>{match.Groups["content"].Value}</form>";
+            var rawAttrs = match.Groups["attrs"].Value;
+            var debounce = GetAttribute(rawAttrs, "Debounce");
+            var loading = GetAttribute(rawAttrs, "Loading") ?? GetAttribute(rawAttrs, "AutoDisable");
+            var extraAttrs = new StringBuilder();
+            if (!string.IsNullOrWhiteSpace(debounce))
+            {
+                extraAttrs.Append($" data-cs-debounce=\"{Html(debounce)}\"");
+            }
+            if (string.Equals(loading, "true", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(loading))
+            {
+                extraAttrs.Append(" data-cs-loading=\"true\"");
+            }
+
+            var attrs = RenderHtmlAttributes(rawAttrs, state, "Method", "Debounce", "Loading", "AutoDisable");
+            var method = SafeFormMethod(GetAttribute(rawAttrs, "Method"));
+            return $"<form method=\"{Html(method)}\" data-cs-vm{extraAttrs}{attrs}>{match.Groups["content"].Value}</form>";
         });
+
+        foreach (var renderer in _customTagRenderers.Values)
+        {
+            var regex = renderer.IsSelfClosing ? SelfClosing(renderer.TagName) : TagBlock(renderer.TagName);
+            html = regex.Replace(html, m =>
+            {
+                var attrs = m.Groups["attrs"].Value;
+                var inner = renderer.IsSelfClosing ? string.Empty : m.Groups["content"].Value;
+                return renderer.Render(attrs, inner, state);
+            });
+        }
 
         html = RegionRegex.Replace(html, match => RenderRegion(match.Groups["attrs"].Value, match.Groups["content"].Value, state));
 
@@ -937,8 +1030,12 @@ public class PageRenderer
         var rows = GetAttribute(rawAttributes, "Rows");
         var id = GetAttribute(rawAttributes, "Id") ?? name;
         var placeholder = GetAttribute(rawAttributes, "Placeholder");
-        var commonAttributes = RenderHtmlAttributes(rawAttributes, state, "Name", "Label", "Type", "Rows", "Id", "Placeholder");
-        var inputValue = Html(FormatValue(GetValue(state, name), null));
+        var source = GetAttribute(rawAttributes, "Source");
+        var sourceField = GetAttribute(rawAttributes, "SourceField");
+        var options = GetAttribute(rawAttributes, "Options");
+        var commonAttributes = RenderHtmlAttributes(rawAttributes, state, "Name", "Label", "Type", "Rows", "Id", "Placeholder", "Source", "SourceField", "Options");
+        var rawVal = GetValue(state, name);
+        var inputValue = Html(FormatValue(rawVal, null));
 
         if (type.Equals("textarea", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(rows))
         {
@@ -947,21 +1044,94 @@ public class PageRenderer
             return $"<label for=\"{Html(id)}\">{Html(label)}<textarea id=\"{Html(id)}\" name=\"{Html(name)}\" data-cs-bind=\"{Html(name)}\"{rowsAttribute}{placeholderAttribute}{commonAttributes}>{inputValue}</textarea></label>";
         }
 
+        if (type.Equals("select", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(source) || !string.IsNullOrWhiteSpace(options))
+        {
+            var sourceAttr = string.IsNullOrWhiteSpace(source) ? string.Empty : $" data-cs-source=\"{Html(RenderBindings(source, state))}\"";
+            var sourceFieldAttr = string.IsNullOrWhiteSpace(sourceField) ? string.Empty : $" data-cs-source-field=\"{Html(RenderBindings(sourceField, state))}\"";
+            var optionsSb = new StringBuilder();
+
+            if (!string.IsNullOrWhiteSpace(placeholder))
+            {
+                optionsSb.Append("<option value=\"\">").Append(Html(RenderBindings(placeholder, state))).Append("</option>");
+            }
+
+            if (!string.IsNullOrWhiteSpace(options))
+            {
+                var optionItems = options.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (var opt in optionItems)
+                {
+                    var parts = opt.Split(':', 2, StringSplitOptions.TrimEntries);
+                    var optVal = parts[0];
+                    var optText = parts.Length > 1 ? parts[1] : parts[0];
+                    var isSelected = string.Equals(optVal, rawVal?.ToString(), StringComparison.OrdinalIgnoreCase);
+                    optionsSb.Append("<option value=\"").Append(Html(optVal)).Append('"');
+                    if (isSelected) optionsSb.Append(" selected");
+                    optionsSb.Append('>').Append(Html(optText)).Append("</option>");
+                }
+            }
+
+            return $"<label for=\"{Html(id)}\">{Html(label)}<select id=\"{Html(id)}\" name=\"{Html(name)}\" data-cs-bind=\"{Html(name)}\"{sourceAttr}{sourceFieldAttr}{commonAttributes}>{optionsSb}</select></label>";
+        }
+
+        if (type.Equals("checkbox", StringComparison.OrdinalIgnoreCase))
+        {
+            var isChecked = IsTruthy(rawVal);
+            var checkedAttr = isChecked ? " checked" : string.Empty;
+            return $"<label for=\"{Html(id)}\" class=\"cs-checkbox\"><input id=\"{Html(id)}\" type=\"checkbox\" name=\"{Html(name)}\" value=\"true\" data-cs-bind=\"{Html(name)}\"{checkedAttr}{commonAttributes} /><span>{Html(label)}</span></label>";
+        }
+
         var placeholderInput = string.IsNullOrWhiteSpace(placeholder) ? string.Empty : $" placeholder=\"{Html(RenderBindings(placeholder, state))}\"";
         return $"<label for=\"{Html(id)}\">{Html(label)}<input id=\"{Html(id)}\" type=\"{Html(type)}\" name=\"{Html(name)}\" value=\"{inputValue}\" data-cs-bind=\"{Html(name)}\"{placeholderInput}{commonAttributes} /></label>";
     }
 
     private static string RenderCrudField(CrudField field, IReadOnlyDictionary<string, object?> state)
     {
-        var value = Html(FormatValue(GetValue(state, field.Name), null));
+        var rawVal = GetValue(state, field.Name);
+        var value = Html(FormatValue(rawVal, null));
         var id = Html(field.Name);
         var label = Html(field.Label);
         var name = Html(field.Name);
 
-        if (field.Type.Equals("textarea", StringComparison.OrdinalIgnoreCase) || field.Rows is not null)
+        if (field.Type.Equals("textarea", StringComparison.OrdinalIgnoreCase) || (field.Rows is not null && !field.Type.Equals("select", StringComparison.OrdinalIgnoreCase)))
         {
             var rows = field.Rows is null ? string.Empty : $" rows=\"{Html(field.Rows)}\"";
             return $"<label for=\"{id}\">{label}<textarea id=\"{id}\" name=\"{name}\" data-cs-bind=\"{name}\"{rows}>{value}</textarea></label>";
+        }
+
+        if (field.Type.Equals("select", StringComparison.OrdinalIgnoreCase))
+        {
+            var optionsSb = new StringBuilder();
+            var meta = field.Rows;
+            var sourceAttr = string.Empty;
+            if (!string.IsNullOrWhiteSpace(meta))
+            {
+                if (meta.Contains('|') || meta.Contains(','))
+                {
+                    var sep = meta.Contains('|') ? '|' : ',';
+                    foreach (var opt in meta.Split(sep, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        var parts = opt.Split(':', 2, StringSplitOptions.TrimEntries);
+                        var optVal = parts[0];
+                        var optText = parts.Length > 1 ? parts[1] : parts[0];
+                        var isSelected = string.Equals(optVal, rawVal?.ToString(), StringComparison.OrdinalIgnoreCase);
+                        optionsSb.Append("<option value=\"").Append(Html(optVal)).Append('"');
+                        if (isSelected) optionsSb.Append(" selected");
+                        optionsSb.Append('>').Append(Html(optText)).Append("</option>");
+                    }
+                }
+                else
+                {
+                    sourceAttr = $" data-cs-source=\"{Html(meta)}\"";
+                }
+            }
+            return $"<label for=\"{id}\">{label}<select id=\"{id}\" name=\"{name}\" data-cs-bind=\"{name}\"{sourceAttr}>{optionsSb}</select></label>";
+        }
+
+        if (field.Type.Equals("checkbox", StringComparison.OrdinalIgnoreCase))
+        {
+            var isChecked = IsTruthy(rawVal);
+            var checkedAttr = isChecked ? " checked" : string.Empty;
+            return $"<label for=\"{id}\" class=\"cs-checkbox\"><input id=\"{id}\" type=\"checkbox\" name=\"{name}\" value=\"true\" data-cs-bind=\"{name}\"{checkedAttr} /><span>{label}</span></label>";
         }
 
         return $"<label for=\"{id}\">{label}<input id=\"{id}\" type=\"{Html(field.Type)}\" name=\"{name}\" value=\"{value}\" data-cs-bind=\"{name}\" /></label>";
@@ -1146,10 +1316,13 @@ public class PageRenderer
         return $"<nav class=\"cs-pager\" aria-label=\"Pagination\"{attrs}>{links}</nav>";
     }
 
-    private static string? ExtractBindingName(string binding)
+    private static string? ExtractBindingName(string? binding)
     {
+        if (string.IsNullOrWhiteSpace(binding))
+            return null;
+
         var match = BindingRegex.Match(binding);
-        return match.Success ? match.Groups["name"].Value : binding;
+        return match.Success ? match.Groups["name"].Value.Trim() : binding.Trim();
     }
 
     private static System.Collections.IEnumerable? GetEnumerableFromBinding(string rawAttributes, string attributeName, IReadOnlyDictionary<string, object?> state)
@@ -1166,7 +1339,7 @@ public class PageRenderer
         return value is System.Collections.IEnumerable items && value is not string ? items : null;
     }
 
-    private static string? GetAttribute(string rawAttributes, string targetName)
+    public static string? GetAttribute(string rawAttributes, string targetName)
     {
         foreach (Match match in AttributeRegex.Matches(rawAttributes))
         {

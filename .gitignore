@@ -13,6 +13,9 @@ obj/
 # NuGet
 *.nupkg
 packages/
+!src/packages/
+src/packages/*
+!src/packages/.gitkeep
 
 # VSIX build output
 *.vsix

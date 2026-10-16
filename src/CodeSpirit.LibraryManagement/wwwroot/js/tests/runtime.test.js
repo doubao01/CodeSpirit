@@ -272,6 +272,86 @@ function run() {
     document.body.removeChild(form);
   });
 
+  test('VmChain validate url, numeric, integer and phone', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var website = document.createElement('input');
+    website.setAttribute('name', 'website');
+    website.value = 'not-a-url';
+    var score = document.createElement('input');
+    score.setAttribute('name', 'score');
+    score.value = 'abc';
+    var count = document.createElement('input');
+    count.setAttribute('name', 'count');
+    count.value = '12.5';
+    var phone = document.createElement('input');
+    phone.setAttribute('name', 'phone');
+    phone.value = 'invalid#phone';
+    form.appendChild(website);
+    form.appendChild(score);
+    form.appendChild(count);
+    form.appendChild(phone);
+    document.body.appendChild(form);
+
+    var vm = CodeSpirit.vm(form);
+    assert.ok(vm.validate({ website: { url: true } }) === false);
+    assert.ok(vm.validate({ score: { numeric: true } }) === false);
+    assert.ok(vm.validate({ count: { integer: true } }) === false);
+    assert.ok(vm.validate({ phone: { phone: true } }) === false);
+
+    website.value = 'https://codespirit.dev';
+    score.value = '-42.8';
+    count.value = '100';
+    phone.value = '+1-555-0199';
+    assert.ok(vm.validate({
+      website: { url: true },
+      score: { numeric: true },
+      count: { integer: true },
+      phone: { phone: true }
+    }) === true);
+    document.body.removeChild(form);
+  });
+
+  test('VmChain validate matches cross-field rule', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var pwd = document.createElement('input');
+    pwd.setAttribute('name', 'password');
+    pwd.value = 'secret123';
+    var confirm = document.createElement('input');
+    confirm.setAttribute('name', 'confirmPassword');
+    confirm.value = 'secret456';
+    form.appendChild(pwd);
+    form.appendChild(confirm);
+    document.body.appendChild(form);
+
+    var vm = CodeSpirit.vm(form);
+    assert.ok(vm.validate({ confirmPassword: { matches: 'password' } }) === false);
+    confirm.value = 'secret123';
+    assert.ok(vm.validate({ confirmPassword: { matches: 'password' } }) === true);
+    document.body.removeChild(form);
+  });
+
+  test('CodeSpirit.registerValidator handles custom global rule', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var code = document.createElement('input');
+    code.setAttribute('name', 'promoCode');
+    code.value = 'NOPE';
+    form.appendChild(code);
+    document.body.appendChild(form);
+
+    CodeSpirit.registerValidator('startsCode', function (val, param) {
+      return String(val || '').startsWith(param) || 'Must start with ' + param;
+    });
+
+    var vm = CodeSpirit.vm(form);
+    assert.ok(vm.validate({ promoCode: { startsCode: 'CSP' } }) === false);
+    code.value = 'CSP-2026';
+    assert.ok(vm.validate({ promoCode: { startsCode: 'CSP' } }) === true);
+    document.body.removeChild(form);
+  });
+
   test('data-cs-attr blocks unsafe dynamic attributes', function () {
     var form = document.createElement('form');
     form.setAttribute('data-cs-vm', '');

@@ -14,6 +14,10 @@ public class PageParser
         @"(?<name>[A-Za-z][A-Za-z0-9_-]*)\s*=\s*[""'](?<value>[^""']*)[""']",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    private static readonly Regex PageDirectiveRegex = new(
+        @"<%@\s*Page\b(?<attrs>.*?)%>",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
     public PageDescriptor? ParseFromViewModelType(Type viewModelType)
     {
         var attr = viewModelType.GetCustomAttribute<PageDirectiveAttribute>();
@@ -33,18 +37,11 @@ public class PageParser
             return null;
 
         var content = File.ReadAllText(filePath);
-        var start = content.IndexOf("<%@", StringComparison.OrdinalIgnoreCase);
-        if (start < 0)
+        var match = PageDirectiveRegex.Match(content);
+        if (!match.Success)
             return null;
 
-        var end = content.IndexOf("%>", start, StringComparison.OrdinalIgnoreCase);
-        if (end < 0)
-            return null;
-
-        var directiveText = content[(start + 3)..end].Trim();
-        if (directiveText.StartsWith("Page", StringComparison.OrdinalIgnoreCase))
-            directiveText = directiveText[4..].Trim();
-
+        var directiveText = match.Groups["attrs"].Value.Trim();
         var properties = ParseDirectiveProperties(directiveText);
 
         var route = properties.GetValueOrDefault("Route");

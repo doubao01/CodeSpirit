@@ -274,6 +274,46 @@ public class ViewModelTests
 
         Assert.Null(response.Errors);
     }
+
+    [Fact]
+    public void ToneAnalyzer_ForStatus_HandlesWhitespaceAndCase()
+    {
+        Assert.Equal("green", ToneAnalyzer.ForStatus("  AVAILABLE  "));
+        Assert.Equal("red", ToneAnalyzer.ForStatus(" Error\n"));
+        Assert.Equal("amber", ToneAnalyzer.ForStatus(" pending\t"));
+        Assert.Null(ToneAnalyzer.ForStatus("unknown_status"));
+        Assert.Null(ToneAnalyzer.ForStatus(null));
+    }
+
+    [Fact]
+    public void ToneAnalyzer_ForNumeric_HandlesNullOrFewSiblings()
+    {
+        Assert.Equal("green", ToneAnalyzer.ForNumeric(10m, null));
+        Assert.Equal("red", ToneAnalyzer.ForNumeric(-5m, null));
+        Assert.Equal("blue", ToneAnalyzer.ForNumeric(0m, null));
+        Assert.Equal("green", ToneAnalyzer.ForNumeric(5m, new[] { 1m }));
+    }
+
+    [Fact]
+    public void ViewModel_ToState_SupportsCustomBindingName()
+    {
+        var vm = new CustomBindingViewModel { QueryText = "search term" };
+        var state = vm.ToState();
+
+        Assert.Equal("search term", state["q"]);
+        Assert.Equal("search term", state["QueryText"]);
+
+        var response = vm.ToResponse();
+        Assert.Equal("search term", response.State["q"]);
+        Assert.True(response.Bindings.ContainsKey("q"));
+        Assert.Equal("TwoWay", response.Bindings["q"].Direction);
+    }
+}
+
+class CustomBindingViewModel : ViewModel
+{
+    [Bind(BindDirection.TwoWay, Name = "q")]
+    public string QueryText { get; set; } = "";
 }
 
 class TestViewModel : ViewModel

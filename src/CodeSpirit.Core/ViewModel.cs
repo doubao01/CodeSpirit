@@ -124,8 +124,17 @@ public abstract class ViewModel
     public Dictionary<string, object?> ToState()
     {
         var state = new Dictionary<string, object?>();
-        foreach (var prop in GetMetadata(GetType()).BindProps)
-            state[prop.Name] = prop.GetValue(this);
+        var meta = GetMetadata(GetType());
+        foreach (var (prop, attr) in meta.BindWithMeta)
+        {
+            var val = prop.GetValue(this);
+            var name = attr.Name ?? prop.Name;
+            state[name] = val;
+            if (!string.Equals(name, prop.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                state[prop.Name] = val;
+            }
+        }
         return state;
     }
 

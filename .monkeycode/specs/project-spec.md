@@ -119,8 +119,8 @@ CodeSpirit 是一个面向 .NET 10 的约定式应用框架，提供 Spring Boot
 - ✓ `<cs:Tree>` 递归树形组件和内置折叠展开已可用（P1）。
 - ✓ `<cs:Wizard>` 多步向导组件和内置步骤切换已可用（P1）。
 - ✓ `data-cs-source` 选项数据源协议已可用（P1）。
-- ✓ 渲染缓存、路径缓存和指标机制已实现，115 个 C# 测试 + JS 边界验证全通过。
-- ✓ JS 测试套件已扩展至 58 个表达式、VM 链、意图分析、主题 token、运行时快捷 API 全覆盖用例。
+- ✓ 渲染缓存、路径缓存和指标机制已实现，137 个 C# 测试 + JS 边界验证全通过。
+- ✓ JS 测试套件已扩展至 61 个表达式、VM 链、意图分析、主题 token、运行时快捷 API 及拓展校验全覆盖用例。
 
 ## 验证标准
 
@@ -144,3 +144,7 @@ dotnet build src/CodeSpirit.slnx
 - ✓ 为意图识别增加低置信度调试提示。
 - ✓ 为 VSIX 模板增加更多可复用页面片段。
 - ✓ 将项目文档继续保持为 docs 单文件、specs 单文件结构。
+- ✓ 扩展源码生成器静态诊断 CSP014（命令返回值类型校验）与 Roslyn 内存编译测试。
+- ✓ 开放 `ITagRenderer` 自定义标签扩展接口并支持 `<cs:Form>` / `<cs:Button>` 原生 Loading 与 Debounce 防抖。
+- ✓ 扩展前端运行时校验体系（url/numeric/integer/phone/matches 与 `CodeSpirit.registerValidator` 全局校验注册）。
+- ✓ `ViewModelExecutor` 支持并 await `ValueTask` 异步命令。

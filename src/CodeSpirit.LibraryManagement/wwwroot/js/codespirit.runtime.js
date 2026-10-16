@@ -442,7 +442,7 @@
   }
 
   function setLoading(form, isLoading, submitter) {
-    var controls = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+    var controls = form.querySelectorAll('button[type="submit"], input[type="submit"], button[data-cs-command]');
     if (isLoading) {
       form.classList.add('cs-loading');
       form.setAttribute('data-cs-busy', '');
@@ -454,6 +454,9 @@
       });
       if (submitter) {
         submitter.setAttribute('data-cs-submitting', '');
+        if (submitter.getAttribute('data-cs-loading') === 'true' || form.getAttribute('data-cs-loading') === 'true') {
+          submitter.classList.add('cs-btn-loading');
+        }
       }
     } else {
       form.classList.remove('cs-loading');
@@ -467,6 +470,7 @@
       });
       form.querySelectorAll('[data-cs-submitting]').forEach(function (btn) {
         btn.removeAttribute('data-cs-submitting');
+        btn.classList.remove('cs-btn-loading');
       });
     }
   }
@@ -508,9 +512,24 @@
       return;
     }
 
+    var submitter = event.submitter || (lastSubmitter && lastSubmitter.form === form ? lastSubmitter : null);
+    var debounceMs = parseInt(
+      (submitter && submitter.getAttribute('data-cs-debounce')) ||
+      form.getAttribute('data-cs-debounce'),
+      10
+    );
+    if (!isNaN(debounceMs) && debounceMs > 0) {
+      var now = Date.now();
+      var lastSubmit = form._csLastSubmit || 0;
+      if (now - lastSubmit < debounceMs) {
+        event.preventDefault();
+        return;
+      }
+      form._csLastSubmit = now;
+    }
+
     event.preventDefault();
     var payload = serializeForm(form);
-    var submitter = event.submitter || (lastSubmitter && lastSubmitter.form === form ? lastSubmitter : null);
     setLoading(form, true, submitter);
     clearErrors(form);
     var command = readCommand(submitter);
@@ -541,7 +560,7 @@
 
   function rememberSubmitter(event) {
     var target = event.target;
-    var submitter = target && target.closest ? target.closest('button[type="submit"], input[type="submit"]') : null;
+    var submitter = target && target.closest ? target.closest('button[type="submit"], input[type="submit"], button[data-cs-command]') : null;
     if (submitter && submitter.form) {
       lastSubmitter = submitter;
     }
@@ -664,6 +683,13 @@
   }
 
   var _observers = {};
+  var _customValidators = {};
+
+  function registerValidator(name, validatorFn) {
+    if (typeof name === 'string' && typeof validatorFn === 'function') {
+      _customValidators[name] = validatorFn;
+    }
+  }
 
   function notifyObservers(form, changes) {
     var id = form.getAttribute('data-cs-vm-id') || form.id || form.getAttribute('name') || '';
@@ -860,6 +886,30 @@
           return;
         }
 
+        if (fieldRules.url && !/^https?:\/\/\S+$/i.test(String(value || '').trim())) {
+          errors[field] = fieldRules.message || (field + ' must be a valid URL');
+          valid = false;
+          return;
+        }
+
+        if (fieldRules.numeric && !/^-?\d+(\.\d+)?$/.test(String(value || '').trim())) {
+          errors[field] = fieldRules.message || (field + ' must be numeric');
+          valid = false;
+          return;
+        }
+
+        if (fieldRules.integer && !/^-?\d+$/.test(String(value || '').trim())) {
+          errors[field] = fieldRules.message || (field + ' must be an integer');
+          valid = false;
+          return;
+        }
+
+        if ((fieldRules.phone || fieldRules.tel) && !/^[+]?[\d\s-]{7,20}$/.test(String(value || '').trim())) {
+          errors[field] = fieldRules.message || (field + ' must be a valid phone number');
+          valid = false;
+          return;
+        }
+
         if (fieldRules.min != null && parseFloat(value) < fieldRules.min) {
           errors[field] = fieldRules.message || (field + ' must be at least ' + fieldRules.min);
           valid = false;
@@ -872,11 +922,32 @@
           return;
         }
 
+        if (fieldRules.matches) {
+          var targetVal = self.get(fieldRules.matches);
+          if (value !== targetVal) {
+            errors[field] = fieldRules.message || (field + ' does not match ' + fieldRules.matches);
+            valid = false;
+            return;
+          }
+        }
+
+        for (var customRule in _customValidators) {
+          if (Object.prototype.hasOwnProperty.call(_customValidators, customRule) && fieldRules[customRule]) {
+            var ruleResult = _customValidators[customRule](value, fieldRules[customRule], field, self);
+            if (ruleResult !== true) {
+              errors[field] = fieldRules.message || (typeof ruleResult === 'string' ? ruleResult : (field + ' is invalid'));
+              valid = false;
+              return;
+            }
+          }
+        }
+
         if (fieldRules.custom && typeof fieldRules.custom === 'function') {
           var customResult = fieldRules.custom(value, field);
           if (customResult !== true) {
             errors[field] = typeof customResult === 'string' ? customResult : (field + ' is invalid');
             valid = false;
+            return;
           }
         }
       });
@@ -992,6 +1063,8 @@
   window.CodeSpirit.updateField = updateField;
   window.CodeSpirit.vm = vm;
   window.CodeSpirit.VmChain = VmChain;
+  window.CodeSpirit.registerValidator = registerValidator;
+  window.CodeSpirit.validators = _customValidators;
   if (!window.$cs) {
     window.$cs = window.CodeSpirit;
   }

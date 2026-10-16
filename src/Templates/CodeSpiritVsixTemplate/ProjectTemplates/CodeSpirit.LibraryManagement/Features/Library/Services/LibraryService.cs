@@ -3,8 +3,9 @@ using System.Globalization;
 using System.Text;
 using ServiceAttribute = CodeSpirit.Core.Attributes.ServiceAttribute;
 using CodeSpiritServiceLifetime = CodeSpirit.Core.Attributes.ServiceLifetime;
+using CodeSpirit.Core.Mvvm;
 
-namespace CodeSpirit.LibraryManagement.Features.Library.Services;
+namespace $safeprojectname$.Features.Library.Services;
 
 [Service(Lifetime = CodeSpiritServiceLifetime.Singleton)]
 public class LibraryService
@@ -686,14 +687,7 @@ public class LibraryService
             book.DueDate = currentLoan?.DueAt ?? string.Empty;
             book.ReservedBy = _reservations.FirstOrDefault(item => item.BookId == book.Id && item.Status == ReservationStatus.Waiting)?.ReaderName ?? string.Empty;
             book.Status = currentLoan?.Status == LoanStatus.Overdue ? BookStatus.Overdue : book.AvailableCopies > 0 ? BookStatus.Available : hasWaiting ? BookStatus.Reserved : BookStatus.Borrowed;
-            book.StatusTone = book.Status switch
-            {
-                BookStatus.Available => ToneConstants.Green,
-                BookStatus.Borrowed => ToneConstants.Amber,
-                BookStatus.Reserved => ToneConstants.Blue,
-                BookStatus.Overdue => ToneConstants.Red,
-                _ => ToneConstants.Purple
-            };
+            book.StatusTone = ToneAnalyzer.ForStatus(book.Status.ToString()) ?? ToneConstants.Blue;
         }
     }
 
