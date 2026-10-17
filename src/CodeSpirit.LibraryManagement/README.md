@@ -49,12 +49,13 @@ CodeSpirit.LibraryManagement/
 | `cs:Table` | 渲染表格 |
 | `cs:Column` | 自定义表格单元格模板 |
 | `cs:Toolbar` | 渲染工具栏 |
-| `cs:Tabs` | 渲染标签页 |
+| `cs:Tabs` | 渲染标签页，内置 ARIA tab 语义与左右方向键切换 |
 | `cs:Modal` | 渲染弹窗 |
 | `cs:Pager` | 渲染分页 |
 | `cs:Region` | 渲染局部刷新区域 |
 | `cs:Scripts` | 渲染内置脚本资源 |
 | `cs:Script` | 渲染页面级脚本 |
+| `cs:Wizard` | 可点击分步向导，内置 ARIA tab 语义与左右方向键切换 |
 
 ## 前端工具链
 

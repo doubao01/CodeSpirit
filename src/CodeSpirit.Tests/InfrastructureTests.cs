@@ -904,6 +904,11 @@ public class PageRendererTagTests
         Assert.Contains("href=\"#loans\" class=\"cs-tab active\"", html);
         Assert.Contains("id=\"loans\" class=\"cs-tab-panel active\"", html);
         Assert.Contains("id=\"overview\" class=\"cs-tab-panel\"", html);
+        Assert.Contains("id=\"cs-tab-2\" href=\"#loans\"", html);
+        Assert.Contains("role=\"tab\" aria-controls=\"loans\"", html);
+        Assert.Contains("aria-selected=\"true\" tabindex=\"0\"", html);
+        Assert.Contains("role=\"tabpanel\" aria-labelledby=\"cs-tab-2\"", html);
+        Assert.Contains("id=\"overview\" class=\"cs-tab-panel\" role=\"tabpanel\" aria-labelledby=\"cs-tab-1\" hidden", html);
     }
 
     [Fact]
@@ -993,6 +998,11 @@ public class PageRendererTagTests
         Assert.Contains(">Second<", html);
         Assert.Contains("cs-wizard-panel active", html);
         Assert.Contains(">Two<", html);
+        Assert.Contains("role=\"tablist\"", html);
+        Assert.Contains("id=\"cs-wizard-tab-2\" class=\"cs-wizard-step active\"", html);
+        Assert.Contains("data-cs-wizard-step=\"step-2\" role=\"tab\" aria-controls=\"cs-wizard-panel-2\"", html);
+        Assert.Contains("aria-selected=\"true\" tabindex=\"0\"", html);
+        Assert.Contains("id=\"cs-wizard-panel-1\" class=\"cs-wizard-panel\" data-cs-wizard-panel=\"step-1\" role=\"tabpanel\" aria-labelledby=\"cs-wizard-tab-1\" hidden", html);
     }
 
     [Fact]
@@ -1145,7 +1155,7 @@ public class PageRendererTagTests
             new Dictionary<string, object?>());
 
         Assert.Contains("data-ui=\"wizard\"", html);
-        Assert.Contains("<button type=\"button\" class=\"cs-wizard-step active\"", html);
+        Assert.Contains("<button type=\"button\" id=\"cs-wizard-tab-1\" class=\"cs-wizard-step active\"", html);
         Assert.Contains("aria-selected=\"true\"", html);
         Assert.Contains("cs-wizard-panel", html);
         Assert.DoesNotContain("cs-wizard-step cs-wizard-step", html);
@@ -1158,9 +1168,9 @@ public class PageRendererTagTests
             "<cs:Wizard ActiveStep=\"details\"><cs:Step Key=\"intro\" Title=\"Intro\">One</cs:Step><cs:Step Key=\"details\" Title=\"Details\">Two</cs:Step></cs:Wizard>",
             new Dictionary<string, object?>());
 
-        Assert.Contains("data-cs-wizard-step=\"intro\" aria-selected=\"false\"", html);
-        Assert.Contains("data-cs-wizard-step=\"details\" aria-selected=\"true\"", html);
-        Assert.Contains("data-cs-wizard-panel=\"intro\" style=\"display:none\"", html);
+        Assert.Contains("data-cs-wizard-step=\"intro\" role=\"tab\" aria-controls=\"cs-wizard-panel-1\"", html);
+        Assert.Contains("data-cs-wizard-step=\"details\" role=\"tab\" aria-controls=\"cs-wizard-panel-2\" aria-selected=\"true\"", html);
+        Assert.Contains("data-cs-wizard-panel=\"intro\" role=\"tabpanel\" aria-labelledby=\"cs-wizard-tab-1\" hidden style=\"display:none\"", html);
         Assert.Contains("data-cs-wizard-panel=\"details\"", html);
     }
 

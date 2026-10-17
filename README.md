@@ -50,7 +50,7 @@ dotnet run
 | 语义布局 | `<cs:Grid>`、`<cs:Card>`、`<cs:Stack>` | 消灭页面级布局 CSS |
 | 复合组件 | `<cs:Crud>`、`<cs:Dashboard>`、`<cs:MetricCard>`、`<cs:ActivityFeed>`、`<cs:QuickLinks>` | 自动生成 CRUD 和大屏 |
 | 场景识别 | `data-cs-scene`、`data-cs-intent` | 24 类通用业务场景自动识别与主题切换 |
-| 内置交互 | `data-cs-confirm`、`data-cs-source` | 确认对话框、选项数据源协议 |
+| 内置交互 | `data-cs-confirm`、`data-cs-source`、`cs:Tabs`、`cs:Wizard` | 确认对话框、选项数据源协议、ARIA 标签页/向导与方向键导航 |
 
 ## 最小应用
 

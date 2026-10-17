@@ -121,6 +121,7 @@
           var selected = link.getAttribute('href') === '#' + key;
           link.classList.toggle('active', selected);
           link.setAttribute('aria-selected', selected ? 'true' : 'false');
+          link.setAttribute('tabindex', selected ? '0' : '-1');
         });
         panels.forEach(function (panel) {
           var selected = panel.getAttribute('id') === key;
@@ -151,6 +152,31 @@
         }
       });
 
+      tabs.addEventListener('keydown', function (event) {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+          return;
+        }
+
+        var links = Array.from(tabs.querySelectorAll('.cs-tab[href]'));
+        if (!links.length) {
+          return;
+        }
+
+        var current = event.currentTarget || null;
+        if (!current || links.indexOf(current) < 0) {
+          current = links.filter(function (link) {
+            return link.getAttribute('aria-selected') === 'true';
+          })[0] || null;
+        }
+        var index = current ? links.indexOf(current) : 0;
+        var delta = event.key === 'ArrowLeft' ? -1 : 1;
+        var nextIndex = (index + delta + links.length) % links.length;
+        var next = links[nextIndex];
+        event.preventDefault();
+        activate(next.getAttribute('href').substring(1));
+        next.focus();
+      });
+
       if (window.location && window.location.hash) {
         var hashKey = window.location.hash.substring(1);
         if (tabs.querySelector('#' + hashKey)) {
@@ -171,6 +197,7 @@
           var selected = step.getAttribute('data-cs-wizard-step') === key;
           step.classList.toggle('active', selected);
           step.setAttribute('aria-selected', selected ? 'true' : 'false');
+          step.setAttribute('tabindex', selected ? '0' : '-1');
         });
         panels.forEach(function (panel) {
           var selected = panel.getAttribute('data-cs-wizard-panel') === key;
@@ -198,6 +225,31 @@
         activate(key);
         // Consumers can persist current step or trigger analytics without custom click wiring.
         wizard.dispatchEvent(new CustomEvent('codespirit:wizard-step', { bubbles: true, detail: { step: key } }));
+      });
+
+      wizard.addEventListener('keydown', function (event) {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+          return;
+        }
+
+        var steps = Array.from(wizard.querySelectorAll('[data-cs-wizard-step]'));
+        if (!steps.length) {
+          return;
+        }
+
+        var current = event.currentTarget || null;
+        if (!current || steps.indexOf(current) < 0) {
+          current = steps.filter(function (step) {
+            return step.getAttribute('aria-selected') === 'true';
+          })[0] || null;
+        }
+        var index = current ? steps.indexOf(current) : 0;
+        var delta = event.key === 'ArrowLeft' ? -1 : 1;
+        var nextIndex = (index + delta + steps.length) % steps.length;
+        var next = steps[nextIndex];
+        event.preventDefault();
+        activate(next.getAttribute('data-cs-wizard-step'));
+        next.focus();
       });
     });
   });

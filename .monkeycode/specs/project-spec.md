@@ -85,6 +85,8 @@ CodeSpirit 是一个面向 .NET 10 的约定式应用框架，提供 Spring Boot
 - WHEN `<cs:Tree>` 节点存在子节点，THE 系统 SHALL 内置折叠展开行为，并触发 `codespirit:tree-toggle` 事件。
 - THE 系统 SHALL 支持 `<cs:Wizard>` 组件，通过 `<cs:Step>` 子元素创建多步向导，`ActiveStep` 控制当前激活步骤。
 - WHEN 用户点击 `<cs:Wizard>` 的步骤标题，THE 系统 SHALL 内置切换当前步骤和面板，并触发 `codespirit:wizard-step` 事件。
+- WHEN `<cs:Wizard>` 包裹 `<cs:Step>`，THE 系统 SHALL 输出 `role="tablist"`、`role="tab"`、`role="tabpanel"` 及 `aria-controls` / `aria-labelledby`，非激活面板保持隐藏。
+- WHEN `<cs:Tabs>` 或 `<cs:Wizard>` 接收左右方向键，THE 系统 SHALL 切换到相邻 tab/step 并保持键盘焦点。
 - WHEN `<cs:Dashboard>` 包裹 `<cs:MetricCard>`、`<cs:ActivityFeed>`、`<cs:QuickLinks>`，THE 系统 SHALL 自动应用仪表盘默认布局。
 - THE 仪表盘子组件 SHALL 支持字段映射属性，使开发者可以复用现有数据模型字段而无需额外投影。
 - WHEN 按钮声明 `data-cs-confirm="消息"`，THE 系统 SHALL 内置确认对话框，无需 jQuery 行为扩展。
@@ -128,9 +130,10 @@ CodeSpirit 是一个面向 .NET 10 的约定式应用框架，提供 Spring Boot
 - ✓ `<cs:Tree>` 递归树形组件和内置折叠展开已可用（P1）。
 - ✓ `<cs:Tree>` 支持可绑定 `EmptyText` 空态节点（P1）。
 - ✓ `<cs:Wizard>` 多步向导组件和内置步骤切换已可用（P1）。
+- ✓ `<cs:Tabs>` 与 `<cs:Wizard>` 支持完整 ARIA 语义和左右方向键键盘导航（P1）。
 - ✓ `data-cs-source` 选项数据源协议已可用（P1）。
 - ✓ 渲染缓存、路径缓存和指标机制已实现，156 个 C# 测试 + JS 边界验证全通过。
-- ✓ JS 测试套件已扩展至 61 个表达式、VM 链、意图分析、主题 token、运行时快捷 API 及拓展校验全覆盖用例。
+- ✓ JS 测试套件已扩展至 61 个前端测试用例，覆盖表达式、VM 链、意图分析、主题 token、运行时快捷 API 及拓展校验。
 
 ## 验证标准
 

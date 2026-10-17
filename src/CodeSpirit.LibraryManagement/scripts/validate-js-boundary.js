@@ -191,6 +191,10 @@ class Element extends EventTarget {
     return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null;
   }
 
+  focus() {
+    this.focused = true;
+  }
+
   setAttribute(name, value) {
     this.attributes[name] = String(value);
     if (name === 'class') {
@@ -1135,6 +1139,15 @@ async function main() {
   assert.ok(detailsPanel.classList.contains('active'));
   assert.strictEqual(detailsTab.getAttribute('aria-selected'), 'true');
 
+  // Verify tabs arrow-key navigation activates the adjacent tab
+  detailsTab.focus();
+  detailsTab.dispatchEvent(new Event('keydown', { key: 'ArrowLeft', bubbles: true }));
+  assert.ok(overviewTab.classList.contains('active'));
+  assert.strictEqual(overviewTab.getAttribute('aria-selected'), 'true');
+  overviewTab.dispatchEvent(new Event('keydown', { key: 'ArrowRight', bubbles: true }));
+  assert.ok(detailsTab.classList.contains('active'));
+  assert.strictEqual(detailsTab.getAttribute('aria-selected'), 'true');
+
   // Verify wizard behavior
   const wizard = form.appendChild(new Element('div', { class: 'cs-wizard', 'data-ui': 'wizard', 'data-cs-wizard': '' }));
   const firstWizardStep = wizard.appendChild(new Element('button', { class: 'cs-wizard-step active', 'data-cs-wizard-step': 'one', 'aria-selected': 'true' }));
@@ -1155,6 +1168,18 @@ async function main() {
   assert.strictEqual(firstWizardPanel.style.display, 'none');
   assert.strictEqual(secondWizardPanel.style.display, '');
   assert.strictEqual(wizardEventStep, 'two');
+
+  // Verify wizard arrow-key navigation activates the adjacent step
+  firstWizardStep.dispatchEvent(new Event('click', { bubbles: true }));
+  assert.ok(firstWizardStep.classList.contains('active'));
+  firstWizardStep.dispatchEvent(new Event('keydown', { key: 'ArrowRight', bubbles: true }));
+  assert.ok(secondWizardStep.classList.contains('active'));
+  assert.strictEqual(secondWizardStep.getAttribute('aria-selected'), 'true');
+  assert.strictEqual(firstWizardPanel.style.display, 'none');
+  assert.strictEqual(secondWizardPanel.style.display, '');
+  secondWizardStep.dispatchEvent(new Event('keydown', { key: 'ArrowLeft', bubbles: true }));
+  assert.ok(firstWizardStep.classList.contains('active'));
+  assert.strictEqual(firstWizardStep.getAttribute('aria-selected'), 'true');
 
   // Verify tree behavior
   const tree = form.appendChild(new Element('section', { class: 'cs-card cs-tree', 'data-ui': 'tree' }));

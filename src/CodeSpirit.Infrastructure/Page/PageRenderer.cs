@@ -982,13 +982,15 @@ public class PageRenderer
         var sb = new StringBuilder();
         sb.Append("<div data-cs-wizard data-ui=\"").Append(Html(ui)).Append('\"').Append(attrs).Append('>');
 
-        sb.Append("<div class=\"cs-wizard-steps\">");
+        sb.Append("<div class=\"cs-wizard-steps\" role=\"tablist\" aria-label=\"Wizard steps\">");
         foreach (var step in steps)
         {
             var isActive = string.Equals(activeStep, step.Index.ToString(), StringComparison.OrdinalIgnoreCase) ||
                           string.Equals(activeStep, step.Key, StringComparison.OrdinalIgnoreCase);
-            sb.Append("<button type=\"button\" class=\"cs-wizard-step").Append(isActive ? " active" : "").Append("\" data-cs-wizard-step=\"").Append(Html(step.Key)).Append("\"");
-            sb.Append(" aria-selected=\"").Append(isActive ? "true" : "false").Append("\">");
+            var tabId = $"cs-wizard-tab-{step.Index + 1}";
+            var panelId = $"cs-wizard-panel-{step.Index + 1}";
+            sb.Append("<button type=\"button\" id=\"").Append(tabId).Append("\" class=\"cs-wizard-step").Append(isActive ? " active" : "").Append("\" data-cs-wizard-step=\"").Append(Html(step.Key)).Append("\"");
+            sb.Append(" role=\"tab\" aria-controls=\"").Append(panelId).Append("\" aria-selected=\"").Append(isActive ? "true" : "false").Append("\" tabindex=\"").Append(isActive ? "0" : "-1").Append("\">");
             sb.Append("<span class=\"cs-wizard-step-number\">").Append(step.Index + 1).Append("</span>");
             sb.Append("<span class=\"cs-wizard-step-title\">").Append(Html(step.Title)).Append("</span>");
             sb.Append("</button>");
@@ -1000,8 +1002,11 @@ public class PageRenderer
         {
             var isVisible = string.Equals(activeStep, step.Index.ToString(), StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(activeStep, step.Key, StringComparison.OrdinalIgnoreCase);
-            sb.Append("<div class=\"cs-wizard-panel").Append(isVisible ? " active" : "").Append("\" data-cs-wizard-panel=\"").Append(Html(step.Key)).Append("\"");
-            if (!isVisible) sb.Append(" style=\"display:none\"");
+            var tabId = $"cs-wizard-tab-{step.Index + 1}";
+            var panelId = $"cs-wizard-panel-{step.Index + 1}";
+            sb.Append("<div id=\"").Append(panelId).Append("\" class=\"cs-wizard-panel").Append(isVisible ? " active" : "").Append("\" data-cs-wizard-panel=\"").Append(Html(step.Key)).Append("\"");
+            sb.Append(" role=\"tabpanel\" aria-labelledby=\"").Append(tabId).Append("\"");
+            if (!isVisible) sb.Append(" hidden style=\"display:none\"");
             sb.Append(">");
             sb.Append(RenderTemplate(step.Content, state));
             sb.Append("</div>");
@@ -1487,8 +1492,18 @@ public class PageRenderer
         if (tabs.Count == 0)
             return string.Empty;
 
-        var nav = string.Concat(tabs.Select(tab => $"<a href=\"#{Html(tab.Key)}\" class=\"cs-tab{(tab.Selected ? " active" : string.Empty)}\" role=\"tab\" aria-selected=\"{tab.Selected.ToString().ToLowerInvariant()}\">{Html(tab.Title)}</a>"));
-        var panels = string.Concat(tabs.Select(tab => $"<section id=\"{Html(tab.Key)}\" class=\"cs-tab-panel{(tab.Selected ? " active" : string.Empty)}\" role=\"tabpanel\">{tab.Content}</section>"));
+        var nav = string.Concat(tabs.Select((tab, index) =>
+        {
+            var tabId = $"cs-tab-{index + 1}";
+            var panelId = tab.Key;
+            return $"<a id=\"{tabId}\" href=\"#{Html(panelId)}\" class=\"cs-tab{(tab.Selected ? " active" : string.Empty)}\" role=\"tab\" aria-controls=\"{Html(panelId)}\" aria-selected=\"{tab.Selected.ToString().ToLowerInvariant()}\" tabindex=\"{(tab.Selected ? "0" : "-1")}\">{Html(tab.Title)}</a>";
+        }));
+        var panels = string.Concat(tabs.Select((tab, index) =>
+        {
+            var tabId = $"cs-tab-{index + 1}";
+            var hidden = tab.Selected ? string.Empty : " hidden";
+            return $"<section id=\"{Html(tab.Key)}\" class=\"cs-tab-panel{(tab.Selected ? " active" : string.Empty)}\" role=\"tabpanel\" aria-labelledby=\"{tabId}\"{hidden}>{tab.Content}</section>";
+        }));
         return $"<div class=\"cs-tabs\" data-ui=\"tabs\"{attrs}><nav class=\"cs-tab-list\" role=\"tablist\">{nav}</nav>{panels}</div>";
     }
 
