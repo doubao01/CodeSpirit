@@ -631,6 +631,31 @@ progress:not([class])::-moz-progress-bar {
   padding: 1rem;
 }
 
+.cs-card-header {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--cs-border);
+}
+
+.cs-card-header h3,
+.cs-card-header p {
+  margin: 0;
+}
+
+.cs-card-header p {
+  color: var(--cs-text-muted);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.cs-empty {
+  margin: 0;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--cs-text-muted);
+  font-size: 0.9rem;
+}
+
 .cs-dashboard {
   display: flex;
   flex-direction: column;
@@ -989,8 +1014,35 @@ progress:not([class])::-moz-progress-bar {
 }
 
 .cs-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--cs-border);
+}
+
+.cs-modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.cs-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--cs-text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cs-modal-close:hover {
+  color: var(--cs-text);
+  background: var(--cs-surface-hover);
 }
 
 .cs-modal-body {

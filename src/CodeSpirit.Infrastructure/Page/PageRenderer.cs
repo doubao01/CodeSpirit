@@ -12,6 +12,8 @@ namespace CodeSpirit.Infrastructure.Page;
 public class PageRenderer
 {
     private const string DefaultLayout = "Pages/Site.master";
+    private const string RepeaterOpenTag = "<cs:Repeater";
+    private const string RepeaterCloseTag = "</cs:Repeater>";
 
     private readonly PageParser _parser;
     private readonly ILogger<PageRenderer> _logger;
@@ -25,7 +27,7 @@ public class PageRenderer
         $@"<cs:{tag}\b(?<attrs>[^>]*)\s*/>", DefaultOptions);
 
     private static readonly Regex ContentRegex = TagBlock("Content");
-    private static readonly Regex RepeaterRegex = TagBlock("Repeater");
+    private static readonly Regex EmptyRegex = TagBlock("Empty");
     private static readonly Regex ConditionalRegex = TagBlock("Conditional");
     private static readonly Regex LinkRegex = TagBlock("Link");
     private static readonly Regex LinkSelfRegex = SelfClosing("Link");
@@ -45,6 +47,7 @@ public class PageRenderer
     private static readonly Regex TableRegex = SelfClosing("Table");
     private static readonly Regex TableBlockRegex = TagBlock("Table");
     private static readonly Regex ColumnRegex = TagBlock("Column");
+    private static readonly Regex ColumnSelfRegex = SelfClosing("Column");
     private static readonly Regex ToolbarRegex = TagBlock("Toolbar");
     private static readonly Regex TabsRegex = TagBlock("Tabs");
     private static readonly Regex TabRegex = TagBlock("Tab");
@@ -54,6 +57,7 @@ public class PageRenderer
     private static readonly Regex CardRegex = TagBlock("Card");
     private static readonly Regex StackRegex = TagBlock("Stack");
     private static readonly Regex CrudRegex = SelfClosing("Crud");
+    private static readonly Regex CrudBlockRegex = TagBlock("Crud");
     private static readonly Regex DashboardRegex = TagBlock("Dashboard");
     private static readonly Regex MetricCardRegex = SelfClosing("MetricCard");
     private static readonly Regex ActivityFeedRegex = SelfClosing("ActivityFeed");
@@ -212,26 +216,7 @@ public class PageRenderer
             return IsTruthy(GetValue(state, name)) ? match.Groups["content"].Value : string.Empty;
         });
 
-        html = RepeaterRegex.Replace(html, match =>
-        {
-            var rawAttrs = match.Groups["attrs"].Value;
-            var itemsBinding = GetAttribute(rawAttrs, "Items") ?? match.Groups["name"].Value;
-            var name = ExtractBindingName(itemsBinding);
-            if (string.IsNullOrWhiteSpace(name))
-                return string.Empty;
-
-            var value = GetValue(state, name);
-            if (value is not System.Collections.IEnumerable items || value is string)
-                return string.Empty;
-
-            var itemTemplate = match.Groups["content"].Value;
-            var sb = new StringBuilder();
-            foreach (var item in items)
-            {
-                sb.Append(RenderTemplateCore(itemTemplate, MergeState(state, item)));
-            }
-            return sb.ToString();
-        });
+        html = RenderRepeaterBlocks(html, state);
 
         string RenderLinkMatch(string rawAttrs, string innerContent)
         {
@@ -309,7 +294,8 @@ public class PageRenderer
 
         html = StackRegex.Replace(html, match => RenderStack(match.Groups["attrs"].Value, match.Groups["content"].Value, state));
 
-        html = CrudRegex.Replace(html, match => RenderCrud(match.Groups["attrs"].Value, state));
+        html = CrudBlockRegex.Replace(html, match => RenderCrud(match.Groups["attrs"].Value, match.Groups["content"].Value, state));
+        html = CrudRegex.Replace(html, match => RenderCrud(match.Groups["attrs"].Value, string.Empty, state));
 
         html = MetricCardRegex.Replace(html, match => RenderMetricCards(match.Groups["attrs"].Value, state));
 
@@ -367,6 +353,164 @@ public class PageRenderer
         html = RegionRegex.Replace(html, match => RenderRegion(match.Groups["attrs"].Value, match.Groups["content"].Value, state));
 
         return DirectiveRegex.Replace(RenderBindings(html, state), string.Empty);
+    }
+
+    private static string RenderRepeaterBlocks(string html, IReadOnlyDictionary<string, object?> state)
+    {
+        var result = new StringBuilder(html.Length);
+        var position = 0;
+
+        while (true)
+        {
+            var start = IndexOfOpenTag(html, RepeaterOpenTag, position);
+            if (start < 0)
+            {
+                result.Append(html, position, html.Length - position);
+                return result.ToString();
+            }
+
+            var openEnd = html.IndexOf('>', start);
+            if (openEnd < 0)
+            {
+                result.Append(html, position, html.Length - position);
+                return result.ToString();
+            }
+
+            var bounds = FindRepeaterBounds(html, openEnd + 1);
+            if (bounds.CloseIndex < 0)
+            {
+                result.Append(html, position, html.Length - position);
+                return result.ToString();
+            }
+
+            result.Append(html, position, start - position);
+            var rawAttrs = html.Substring(start + RepeaterOpenTag.Length, openEnd - start - RepeaterOpenTag.Length);
+            var content = html.Substring(openEnd + 1, bounds.CloseIndex - openEnd - 1);
+            result.Append(RenderRepeaterBlock(rawAttrs, content, state));
+            position = bounds.BlockEnd;
+        }
+    }
+
+    private static int IndexOfOpenTag(string html, string tag, int start)
+    {
+        var index = start;
+        while (index < html.Length)
+        {
+            index = html.IndexOf(tag, index, StringComparison.OrdinalIgnoreCase);
+            if (index < 0)
+                return -1;
+
+            var after = index + tag.Length;
+            if (after >= html.Length || char.IsWhiteSpace(html[after]) || html[after] is '>' or '/')
+                return index;
+
+            index = after;
+        }
+
+        return -1;
+    }
+
+    private static (int CloseIndex, int BlockEnd) FindRepeaterBounds(string html, int contentStart)
+    {
+        var depth = 1;
+        var position = contentStart;
+
+        while (true)
+        {
+            var open = IndexOfOpenTag(html, RepeaterOpenTag, position);
+            var close = html.IndexOf(RepeaterCloseTag, position, StringComparison.OrdinalIgnoreCase);
+            if (close < 0)
+                return (-1, -1);
+
+            if (open >= 0 && open < close)
+            {
+                depth++;
+                position = open + RepeaterOpenTag.Length;
+                continue;
+            }
+
+            depth--;
+            if (depth == 0)
+                return (close, close + RepeaterCloseTag.Length);
+
+            position = close + RepeaterCloseTag.Length;
+        }
+    }
+
+    private static string RenderRepeaterBlock(string rawAttrs, string content, IReadOnlyDictionary<string, object?> state)
+    {
+        var itemsBinding = GetAttribute(rawAttrs, "Items");
+        var name = ExtractBindingName(itemsBinding);
+        var value = string.IsNullOrWhiteSpace(name) ? null : GetValue(state, name);
+
+        var emptyMatch = FindTopLevelEmpty(content);
+        var emptyTemplate = emptyMatch?.Groups["content"].Value;
+        var itemTemplate = emptyMatch is null
+            ? content
+            : content.Remove(emptyMatch.Index, emptyMatch.Length);
+
+        if (value is System.Collections.IEnumerable items && value is not string)
+        {
+            var list = items.Cast<object?>().ToList();
+            if (list.Count > 0)
+            {
+                var sb = new StringBuilder();
+                for (var index = 0; index < list.Count; index++)
+                {
+                    var merged = MergeState(state, list[index]);
+                    merged["index"] = index;
+                    merged["count"] = list.Count;
+                    sb.Append(RenderTemplateCore(itemTemplate, merged));
+                }
+                return sb.ToString();
+            }
+        }
+
+        return RenderRepeaterEmpty(rawAttrs, emptyTemplate, state);
+    }
+
+    private static Match? FindTopLevelEmpty(string content)
+    {
+        var nestedRanges = new List<(int Start, int End)>();
+        var position = 0;
+
+        while (true)
+        {
+            var start = IndexOfOpenTag(content, RepeaterOpenTag, position);
+            if (start < 0)
+                break;
+
+            var openEnd = content.IndexOf('>', start);
+            if (openEnd < 0)
+                break;
+
+            var bounds = FindRepeaterBounds(content, openEnd + 1);
+            if (bounds.CloseIndex < 0)
+                break;
+
+            nestedRanges.Add((start, bounds.BlockEnd));
+            position = bounds.BlockEnd;
+        }
+
+        foreach (Match empty in EmptyRegex.Matches(content))
+        {
+            var insideNested = nestedRanges.Any(range => empty.Index >= range.Start && empty.Index < range.End);
+            if (!insideNested)
+                return empty;
+        }
+
+        return null;
+    }
+
+    private static string RenderRepeaterEmpty(string rawAttributes, string? innerTemplate, IReadOnlyDictionary<string, object?> state)
+    {
+        if (!string.IsNullOrWhiteSpace(innerTemplate))
+            return RenderTemplateCore(innerTemplate, state);
+
+        var emptyText = RenderBindings(GetAttribute(rawAttributes, "EmptyText") ?? string.Empty, state);
+        return string.IsNullOrWhiteSpace(emptyText)
+            ? string.Empty
+            : $"<p class=\"cs-empty\">{Html(emptyText)}</p>";
     }
 
     private static string BuildFallbackHtml(string title, Dictionary<string, object?> state)
@@ -480,9 +624,20 @@ public class PageRenderer
     {
         var tag = SafeTagName(GetAttribute(rawAttributes, "Tag"));
         var tone = RenderBindings(GetAttribute(rawAttributes, "Tone") ?? string.Empty, state);
+        var title = RenderBindings(GetAttribute(rawAttributes, "Title") ?? string.Empty, state);
+        var subtitle = RenderBindings(GetAttribute(rawAttributes, "Subtitle") ?? string.Empty, state);
         var extraClass = string.IsNullOrWhiteSpace(tone) ? string.Empty : $" cs-card-{SafeClassToken(tone)}";
-        var attrs = RenderLayoutAttributes(rawAttributes, state, "cs-card" + extraClass, string.Empty, "Tone", "Tag");
-        return $"<{tag}{attrs}>{content}</{tag}>";
+        var attrs = RenderLayoutAttributes(rawAttributes, state, "cs-card" + extraClass, string.Empty, "Tone", "Tag", "Title", "Subtitle");
+
+        var header = string.Empty;
+        if (!string.IsNullOrWhiteSpace(title) || !string.IsNullOrWhiteSpace(subtitle))
+        {
+            var titleTag = !string.IsNullOrWhiteSpace(title) ? $"<h3>{Html(title)}</h3>" : string.Empty;
+            var subTag = !string.IsNullOrWhiteSpace(subtitle) ? $"<p>{Html(subtitle)}</p>" : string.Empty;
+            header = $"<header class=\"cs-card-header\">{titleTag}{subTag}</header>";
+        }
+
+        return $"<{tag}{attrs}>{header}{content}</{tag}>";
     }
 
     private static string RenderStack(string rawAttributes, string content, IReadOnlyDictionary<string, object?> state)
@@ -497,7 +652,7 @@ public class PageRenderer
         return $"<{tag}{attrs}>{content}</{tag}>";
     }
 
-    private static string RenderCrud(string rawAttributes, IReadOnlyDictionary<string, object?> state)
+    private static string RenderCrud(string rawAttributes, string innerContent, IReadOnlyDictionary<string, object?> state)
     {
         var entity = RenderBindings(GetAttribute(rawAttributes, "Entity") ?? "Record", state);
         var title = RenderBindings(GetAttribute(rawAttributes, "Title") ?? entity, state);
@@ -505,10 +660,11 @@ public class PageRenderer
         var method = SafeFormMethod(GetAttribute(rawAttributes, "Method"));
         var fields = ParseCrudFields(GetAttribute(rawAttributes, "Fields"));
         var commands = ParseCrudCommands(GetAttribute(rawAttributes, "Commands"));
-        if (fields.Count == 0 && commands.Count == 0)
+        var itemsAttr = GetAttribute(rawAttributes, "Items");
+        if (fields.Count == 0 && commands.Count == 0 && string.IsNullOrWhiteSpace(itemsAttr))
             return string.Empty;
 
-        var attrs = RenderLayoutAttributes(rawAttributes, state, "cs-card cs-crud", string.Empty, "Entity", "Title", "Subtitle", "Fields", "Commands", "Method");
+        var attrs = RenderLayoutAttributes(rawAttributes, state, "cs-card cs-crud", string.Empty, "Entity", "Title", "Subtitle", "Fields", "Commands", "Method", "Items", "Columns", "EmptyText");
         var sb = new StringBuilder();
         sb.Append("<section").Append(attrs).Append('>');
 
@@ -522,32 +678,58 @@ public class PageRenderer
             sb.Append("</header>");
         }
 
-        sb.Append("<form method=\"").Append(Html(method)).Append("\" data-cs-vm class=\"cs-stack\">");
-        foreach (var field in fields)
+        if (fields.Count > 0 || commands.Count > 0)
         {
-            sb.Append(RenderCrudField(field, state));
-        }
-
-        if (commands.Count > 0)
-        {
-            sb.Append("<div class=\"cs-row cs-wrap\">");
-            foreach (var command in commands)
+            sb.Append("<form method=\"").Append(Html(method)).Append("\" data-cs-vm class=\"cs-stack\">");
+            foreach (var field in fields)
             {
-                var confirm = string.IsNullOrWhiteSpace(command.Confirm) ? string.Empty : $" data-cs-confirm=\"{Html(command.Confirm)}\"";
-                sb.Append("<button type=\"submit\" data-cs-command=\"")
-                    .Append(Html(command.Name))
-                    .Append("\" class=\"")
-                    .Append(Html(InferButtonClass(command.Name)))
-                    .Append('"')
-                    .Append(confirm)
-                    .Append('>')
-                    .Append(Html(command.Text))
-                    .Append("</button>");
+                sb.Append(RenderCrudField(field, state));
             }
-            sb.Append("</div>");
+
+            if (commands.Count > 0)
+            {
+                sb.Append("<div class=\"cs-row cs-wrap\">");
+                foreach (var command in commands)
+                {
+                    var confirm = string.IsNullOrWhiteSpace(command.Confirm) ? string.Empty : $" data-cs-confirm=\"{Html(command.Confirm)}\"";
+                    sb.Append("<button type=\"submit\" data-cs-command=\"")
+                        .Append(Html(command.Name))
+                        .Append("\" class=\"")
+                        .Append(Html(InferButtonClass(command.Name)))
+                        .Append('"')
+                        .Append(confirm)
+                        .Append('>')
+                        .Append(Html(command.Text))
+                        .Append("</button>");
+                }
+                sb.Append("</div>");
+            }
+
+            sb.Append("</form>");
         }
 
-        sb.Append("</form></section>");
+        if (!string.IsNullOrWhiteSpace(itemsAttr))
+        {
+            var rawColumns = GetAttribute(rawAttributes, "Columns");
+            var columnsAttr = !string.IsNullOrWhiteSpace(rawColumns)
+                ? rawColumns
+                : fields.Count > 0
+                    ? string.Join(",", fields.Select(f => $"{f.Name}:{f.Label}"))
+                    : string.Empty;
+
+            var emptyText = GetAttribute(rawAttributes, "EmptyText");
+            var emptyTextAttr = !string.IsNullOrWhiteSpace(emptyText) ? $" EmptyText=\"{emptyText}\"" : string.Empty;
+            var columnsParam = !string.IsNullOrWhiteSpace(columnsAttr) ? $" Columns=\"{columnsAttr}\"" : string.Empty;
+
+            var tableAttrs = $"Items=\"{itemsAttr}\"{columnsParam}{emptyTextAttr}";
+            var tableHtml = RenderTable(tableAttrs, innerContent, state);
+            if (!string.IsNullOrWhiteSpace(tableHtml))
+            {
+                sb.Append(tableHtml);
+            }
+        }
+
+        sb.Append("</section>");
         return sb.ToString();
     }
 
@@ -710,7 +892,7 @@ public class PageRenderer
             return string.Empty;
 
         var attrs = RenderLayoutAttributes(rawAttributes, state, "cs-card cs-tree", string.Empty,
-            "Items", "ChildrenField", "LabelField", "ValueField", "Collapsed", "data-ui");
+            "Items", "ChildrenField", "LabelField", "ValueField", "Collapsed", "EmptyText", "data-ui");
         var ui = MergeUiBehavior(GetAttribute(rawAttributes, "data-ui"), "tree", state);
         var childrenField = RenderBindings(GetAttribute(rawAttributes, "ChildrenField") ?? "Children", state);
         var labelField = RenderBindings(GetAttribute(rawAttributes, "LabelField") ?? "Label", state);
@@ -725,9 +907,18 @@ public class PageRenderer
         sb.Append(" data-cs-tree-value=\"").Append(Html(valueField)).Append("\"");
         sb.Append(">");
 
+        var emitted = 0;
         foreach (var item in items)
         {
             RenderTreeNode(sb, item, childrenField, labelField, valueField, collapsed, state);
+            emitted++;
+        }
+
+        if (emitted == 0)
+        {
+            var emptyText = RenderBindings(GetAttribute(rawAttributes, "EmptyText") ?? string.Empty, state);
+            if (!string.IsNullOrWhiteSpace(emptyText))
+                sb.Append("<li class=\"cs-empty\">").Append(Html(emptyText)).Append("</li>");
         }
 
         sb.Append("</ul></section>");
@@ -1170,6 +1361,11 @@ public class PageRenderer
 
     private static string RenderTable(string rawAttributes, string content, IReadOnlyDictionary<string, object?> state)
     {
+        var emptyMatch = FindTopLevelEmpty(content);
+        var emptyTemplate = emptyMatch?.Groups["content"].Value;
+        if (emptyMatch is not null)
+            content = content.Remove(emptyMatch.Index, emptyMatch.Length);
+
         var itemsBinding = GetAttribute(rawAttributes, "Items");
         var columns = ParseColumns(GetAttribute(rawAttributes, "Columns"), content);
         if (string.IsNullOrWhiteSpace(itemsBinding) || columns.Count == 0)
@@ -1211,8 +1407,10 @@ public class PageRenderer
 
         if (count == 0)
         {
-            var emptyText = GetAttribute(rawAttributes, "EmptyText") ?? "No records.";
-            body.Append($"<tr><td colspan=\"{columns.Count}\">{Html(emptyText)}</td></tr>");
+            var cell = string.IsNullOrWhiteSpace(emptyTemplate)
+                ? $"<div class=\"cs-empty\">{Html(RenderBindings(GetAttribute(rawAttributes, "EmptyText") ?? "No records.", state))}</div>"
+                : RenderTemplateCore(emptyTemplate, state);
+            body.Append($"<tr class=\"cs-table-empty-row\"><td colspan=\"{columns.Count}\">{cell}</td></tr>");
         }
 
         return $"<table{attrs}><thead><tr>{header}</tr></thead><tbody>{body}</tbody></table>";
@@ -1222,16 +1420,23 @@ public class PageRenderer
     {
         if (!string.IsNullOrWhiteSpace(content))
         {
-            return ColumnRegex.Matches(content)
-                .Select(match =>
-                {
-                    var name = GetAttribute(match.Groups["attrs"].Value, "Name") ?? string.Empty;
-                    var header = GetAttribute(match.Groups["attrs"].Value, "Header") ?? name;
-                    var format = GetAttribute(match.Groups["attrs"].Value, "Format");
-                    return new TableColumn(name, header, format, match.Groups["content"].Value);
-                })
-                .Where(column => !string.IsNullOrWhiteSpace(column.Header))
-                .ToList();
+            var blockColumns = ColumnRegex.Matches(content).Cast<Match>();
+            var selfColumns = ColumnSelfRegex.Matches(content).Cast<Match>();
+            var allMatches = blockColumns.Concat(selfColumns).OrderBy(m => m.Index).ToList();
+            if (allMatches.Count > 0)
+            {
+                return allMatches
+                    .Select(match =>
+                    {
+                        var name = GetAttribute(match.Groups["attrs"].Value, "Name") ?? string.Empty;
+                        var header = GetAttribute(match.Groups["attrs"].Value, "Header") ?? name;
+                        var format = GetAttribute(match.Groups["attrs"].Value, "Format");
+                        var inner = match.Groups["content"].Success ? match.Groups["content"].Value : null;
+                        return new TableColumn(name, header, format, string.IsNullOrEmpty(inner) ? null : inner);
+                    })
+                    .Where(column => !string.IsNullOrWhiteSpace(column.Header))
+                    .ToList();
+            }
         }
 
         if (string.IsNullOrWhiteSpace(rawColumns))
@@ -1292,9 +1497,19 @@ public class PageRenderer
         var id = RenderBindings(GetAttribute(rawAttributes, "Id") ?? "cs-modal", state);
         var title = RenderBindings(GetAttribute(rawAttributes, "Title") ?? string.Empty, state);
         var open = IsTruthyAttribute(RenderBindings(GetAttribute(rawAttributes, "Open") ?? string.Empty, state));
-        var attrs = RenderHtmlAttributes(rawAttributes, state, "Id", "Title", "Open");
+        var closableAttr = GetAttribute(rawAttributes, "Closable");
+        var closable = !string.IsNullOrWhiteSpace(closableAttr) && IsTruthyAttribute(RenderBindings(closableAttr, state));
+        var attrs = RenderHtmlAttributes(rawAttributes, state, "Id", "Title", "Open", "Closable");
         var hidden = open ? string.Empty : " hidden";
-        var titleHtml = string.IsNullOrWhiteSpace(title) ? string.Empty : $"<header class=\"cs-modal-header\"><h2>{Html(title)}</h2></header>";
+
+        var closeBtn = closable
+            ? "<button type=\"button\" class=\"cs-modal-close\" data-modal-close aria-label=\"Close\">&times;</button>"
+            : string.Empty;
+
+        var titleHtml = !string.IsNullOrWhiteSpace(title) || closable
+            ? $"<header class=\"cs-modal-header\">{(string.IsNullOrWhiteSpace(title) ? string.Empty : $"<h2>{Html(title)}</h2>")}{closeBtn}</header>"
+            : string.Empty;
+
         return $"<div id=\"{Html(id)}\" class=\"cs-modal\" data-ui=\"modal\" role=\"dialog\" aria-modal=\"true\"{hidden}{attrs}><div class=\"cs-modal-panel\">{titleHtml}<div class=\"cs-modal-body\">{content}</div></div></div>";
     }
 
@@ -1303,14 +1518,53 @@ public class PageRenderer
         var page = Math.Max(1, ParsePositiveInt(RenderBindings(GetAttribute(rawAttributes, "Page") ?? "1", state), 1));
         var totalPages = Math.Max(1, ParsePositiveInt(RenderBindings(GetAttribute(rawAttributes, "TotalPages") ?? "1", state), 1));
         var url = RenderBindings(GetAttribute(rawAttributes, "Url") ?? "?page={page}", state);
-        var attrs = RenderHtmlAttributes(rawAttributes, state, "Page", "TotalPages", "Url");
+        var maxPages = ParsePositiveInt(RenderBindings(GetAttribute(rawAttributes, "MaxPages") ?? "7", state), 7);
+        var attrs = RenderHtmlAttributes(rawAttributes, state, "Page", "TotalPages", "Url", "MaxPages");
         var links = new StringBuilder();
 
         links.Append(RenderPagerLink(url, Math.Max(1, page - 1), "Previous", page <= 1));
-        for (var index = 1; index <= totalPages; index++)
+        if (totalPages <= maxPages)
         {
-            links.Append(RenderPagerLink(url, index, index.ToString(), false, index == page));
+            for (var index = 1; index <= totalPages; index++)
+            {
+                links.Append(RenderPagerLink(url, index, index.ToString(), false, index == page));
+            }
         }
+        else
+        {
+            var start = Math.Max(2, page - 1);
+            var end = Math.Min(totalPages - 1, page + 1);
+
+            if (page <= 3)
+            {
+                start = 2;
+                end = Math.Min(totalPages - 1, 4);
+            }
+            else if (page >= totalPages - 2)
+            {
+                start = Math.Max(2, totalPages - 3);
+                end = totalPages - 1;
+            }
+
+            links.Append(RenderPagerLink(url, 1, "1", false, page == 1));
+            if (start > 2)
+            {
+                links.Append("<span class=\"cs-pager-ellipsis\">&hellip;</span>");
+            }
+
+            for (var index = start; index <= end; index++)
+            {
+                links.Append(RenderPagerLink(url, index, index.ToString(), false, index == page));
+            }
+
+            if (end < totalPages - 1)
+            {
+                links.Append("<span class=\"cs-pager-ellipsis\">&hellip;</span>");
+            }
+
+            links.Append(RenderPagerLink(url, totalPages, totalPages.ToString(), false, page == totalPages));
+        }
+
         links.Append(RenderPagerLink(url, Math.Min(totalPages, page + 1), "Next", page >= totalPages));
 
         return $"<nav class=\"cs-pager\" aria-label=\"Pagination\"{attrs}>{links}</nav>";
@@ -1451,7 +1705,7 @@ public class PageRenderer
         return null;
     }
 
-    private static IReadOnlyDictionary<string, object?> MergeState(IReadOnlyDictionary<string, object?> parent, object? item)
+    private static Dictionary<string, object?> MergeState(IReadOnlyDictionary<string, object?> parent, object? item)
     {
         var merged = new Dictionary<string, object?>(parent, StringComparer.OrdinalIgnoreCase)
         {

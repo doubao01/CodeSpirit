@@ -26,6 +26,10 @@ CodeSpirit 是一个面向 .NET 10 的约定式应用框架，提供 Spring Boot
 ### R3 内置页面标签
 
 - THE 系统 SHALL 支持 `cs:Content`、`cs:PlaceHolder`、`cs:Repeater`、`cs:Conditional`、`cs:Link`。
+- WHEN `cs:Repeater` 数据为空，THE 系统 SHALL 自动渲染内嵌 `cs:Empty` 块或 `EmptyText` 明文，无需额外条件判断。
+- WHEN `cs:Repeater` 渲染每一项，THE 系统 SHALL 暴露 `index` 与 `count` 绑定值。
+- WHEN `cs:Repeater` 发生嵌套，THE 系统 SHALL 按标签深度配对闭合标签，并让每一层独立渲染各自的空态。
+- WHEN `cs:Table` 或 `cs:Crud` 数据为空，THE 系统 SHALL 渲染内嵌 `cs:Empty` 块或 `EmptyText` 明文，`EmptyText` 支持状态绑定。
 - THE 系统 SHALL 支持 `cs:Form`、`cs:Button`、`cs:Field`、`cs:Table`、`cs:Column` 和 `cs:Region`，减少 MVVM 样板代码。
 - THE 系统 SHALL 支持 `cs:Toolbar`、`cs:Tabs`、`cs:Modal`、`cs:Pager`，提供常见后台和企业应用组件。
 - THE 系统 SHALL 支持 `cs:Scripts` 和 `cs:Script`，统一加载、替换或禁用内置前端资源。
@@ -77,6 +81,7 @@ CodeSpirit 是一个面向 .NET 10 的约定式应用框架，提供 Spring Boot
 - THE 系统 SHALL 支持 `<cs:Crud>` 复合组件，通过 `Entity`、`Fields`、`Commands` 属性自动生成完整 CRUD 表单、按钮和表格联动刷新。
 - THE 系统 SHALL 支持 `<cs:Chart>` 组件，通过 `Type`、`Width`、`Height`、`Data`、`Labels`、`Title` 属性生成 canvas 图表容器。
 - THE 系统 SHALL 支持 `<cs:Tree>` 组件，通过 `Items`、`ChildrenField`、`LabelField`、`ValueField` 属性渲染递归树形结构。
+- WHEN `<cs:Tree>` 数据为空且声明 `EmptyText`，THE 系统 SHALL 渲染 `.cs-empty` 空态节点。
 - WHEN `<cs:Tree>` 节点存在子节点，THE 系统 SHALL 内置折叠展开行为，并触发 `codespirit:tree-toggle` 事件。
 - THE 系统 SHALL 支持 `<cs:Wizard>` 组件，通过 `<cs:Step>` 子元素创建多步向导，`ActiveStep` 控制当前激活步骤。
 - WHEN 用户点击 `<cs:Wizard>` 的步骤标题，THE 系统 SHALL 内置切换当前步骤和面板，并触发 `codespirit:wizard-step` 事件。
@@ -104,6 +109,10 @@ CodeSpirit 是一个面向 .NET 10 的约定式应用框架，提供 Spring Boot
 - ✓ `cs:Form`、`cs:Button`、`cs:Field`、`cs:Table`、`cs:Region` 已可用。
 - ✓ `cs:Toolbar`、`cs:Tabs`、`cs:Modal`、`cs:Pager` 已可用。
 - ✓ `cs:Scripts` 和 `cs:Script` 已支持内置脚本加载、替换和禁用。
+- ✓ `cs:Repeater` 支持内嵌 `cs:Empty` 空态、`EmptyText` 明文空态及 `index`/`count` 绑定，减少页面条件判断。
+- ✓ `cs:Repeater` 嵌套时按深度配对闭合标签，内外层各自渲染空态，空态不会跨层泄漏。
+- ✓ `cs:Table` 和 `cs:Crud` 支持内嵌 `cs:Empty` 与可绑定 `EmptyText`，空表统一使用 `.cs-empty` 视觉。
+- ✓ `cs:Card` 支持 `Title`/`Subtitle` 自动生成卡片头部，`cs:Modal` 支持 `Closable` 关闭按钮，`cs:Pager` 支持 `MaxPages` 窗口化分页。
 - ✓ 图书 CSV 导入导出已通过 MVVM 命令流实现。
 - ✓ 默认视觉系统已覆盖普通 HTML 和常用 `.cs-*` 组件，新增 ul、ol、blockquote、code、pre、hr、fieldset、legend、figure、img、details、summary、nav、aside、header、footer、small、progress、meter 等无类名默认样式。
 - ✓ 场景识别已覆盖 24 类通用业务场景（含 supply-chain、research、security、retail、insurance、ngo）。
@@ -117,9 +126,10 @@ CodeSpirit 是一个面向 .NET 10 的约定式应用框架，提供 Spring Boot
 - ✓ `<cs:Dashboard>` 自动仪表盘布局和子组件字段映射已可用（P2）。
 - ✓ `<cs:Chart>` 图表容器组件已可用（P1）。
 - ✓ `<cs:Tree>` 递归树形组件和内置折叠展开已可用（P1）。
+- ✓ `<cs:Tree>` 支持可绑定 `EmptyText` 空态节点（P1）。
 - ✓ `<cs:Wizard>` 多步向导组件和内置步骤切换已可用（P1）。
 - ✓ `data-cs-source` 选项数据源协议已可用（P1）。
-- ✓ 渲染缓存、路径缓存和指标机制已实现，137 个 C# 测试 + JS 边界验证全通过。
+- ✓ 渲染缓存、路径缓存和指标机制已实现，156 个 C# 测试 + JS 边界验证全通过。
 - ✓ JS 测试套件已扩展至 61 个表达式、VM 链、意图分析、主题 token、运行时快捷 API 及拓展校验全覆盖用例。
 
 ## 验证标准

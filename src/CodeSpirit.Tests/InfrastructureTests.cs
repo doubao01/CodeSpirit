@@ -678,6 +678,50 @@ public class PageRendererTagTests
     }
 
     [Fact]
+    public void Table_EmptyBlockRendersInsteadOfRows()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Table Items=\"{Binding Rows}\"><cs:Column Name=\"Name\" Header=\"Name\" /><cs:Empty><strong>{Binding Hint}</strong></cs:Empty></cs:Table>",
+            new Dictionary<string, object?>
+            {
+                ["Rows"] = Array.Empty<TableRow>(),
+                ["Hint"] = "Nothing here yet"
+            });
+
+        Assert.Contains("class=\"cs-table-empty-row\"", html);
+        Assert.Contains("<td colspan=\"1\"><strong>Nothing here yet</strong></td>", html);
+        Assert.DoesNotContain("<td>Ada</td>", html);
+    }
+
+    [Fact]
+    public void Table_EmptyTextSupportsStateBinding()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Table Items=\"{Binding Rows}\" Columns=\"Name:Name\" EmptyText=\"{Binding Hint}\" />",
+            new Dictionary<string, object?>
+            {
+                ["Rows"] = Array.Empty<TableRow>(),
+                ["Hint"] = "No books matched"
+            });
+
+        Assert.Contains("<div class=\"cs-empty\">No books matched</div>", html);
+    }
+
+    [Fact]
+    public void Table_EmptyBlockDoesNotLeakIntoRenderedRows()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Table Items=\"{Binding Rows}\"><cs:Column Name=\"Name\" Header=\"Name\" /><cs:Empty>No data</cs:Empty></cs:Table>",
+            new Dictionary<string, object?>
+            {
+                ["Rows"] = new[] { new TableRow("Ada", "Active", 12.5m) }
+            });
+
+        Assert.Contains("<td>Ada</td>", html);
+        Assert.DoesNotContain("No data", html);
+    }
+
+    [Fact]
     public void LayoutTags_RenderSemanticClassesAndStyles()
     {
         var html = PageRenderer.RenderTemplateForTests(
@@ -689,6 +733,20 @@ public class PageRendererTagTests
         Assert.Contains("class=\"cs-card cs-card-blue\"", html);
         Assert.Contains("class=\"cs-stack cs-row\"", html);
         Assert.Contains("gap: 0.5rem; align-items: center;", html);
+    }
+
+    [Fact]
+    public void Card_RendersHeaderWhenTitleOrSubtitleProvided()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Card Title=\"Quick Overview\" Subtitle=\"Key metrics summary\"><span>Content</span></cs:Card>",
+            new Dictionary<string, object?>());
+
+        Assert.Contains("class=\"cs-card\"", html);
+        Assert.Contains("<header class=\"cs-card-header\">", html);
+        Assert.Contains("<h3>Quick Overview</h3>", html);
+        Assert.Contains("<p>Key metrics summary</p>", html);
+        Assert.Contains("<span>Content</span>", html);
     }
 
     [Fact]
@@ -713,6 +771,68 @@ public class PageRendererTagTests
         Assert.Contains("data-cs-command=\"ArchiveBook\"", html);
         Assert.Contains("data-cs-confirm=\"Archive this book?\"", html);
         Assert.Contains("cs-btn-danger", html);
+    }
+
+    [Fact]
+    public void Crud_WithItemsAndColumns_RendersTableAlongsideForm()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Crud Entity=\"Book\" Title=\"Book Catalog\" Fields=\"BookTitle:Title\" Commands=\"AddBook:Add\" Items=\"{Binding Books}\" Columns=\"Id:ID,Title:Book Title\" />",
+            new Dictionary<string, object?>
+            {
+                ["BookTitle"] = "Clean Architecture",
+                ["Books"] = new[]
+                {
+                    new { Id = 1, Title = "Clean Code" },
+                    new { Id = 2, Title = "Refactoring" }
+                }
+            });
+
+        Assert.Contains("class=\"cs-card cs-crud\"", html);
+        Assert.Contains("<h2>Book Catalog</h2>", html);
+        Assert.Contains("name=\"BookTitle\" value=\"Clean Architecture\"", html);
+        Assert.Contains("data-cs-command=\"AddBook\"", html);
+        Assert.Contains("<table", html);
+        Assert.Contains("<th>ID</th>", html);
+        Assert.Contains("<th>Book Title</th>", html);
+        Assert.Contains("<td>Clean Code</td>", html);
+        Assert.Contains("<td>Refactoring</td>", html);
+    }
+
+    [Fact]
+    public void Crud_BlockSyntaxWithInnerColumns_RendersTableFromChildColumns()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Crud Entity=\"Book\" Title=\"Book Catalog\" Fields=\"BookTitle:Title\" Commands=\"AddBook:Add\" Items=\"{Binding Books}\"><cs:Column Name=\"Title\" Header=\"Name\" /></cs:Crud>",
+            new Dictionary<string, object?>
+            {
+                ["BookTitle"] = "Domain-Driven Design",
+                ["Books"] = new[]
+                {
+                    new { Title = "Building Microservices" }
+                }
+            });
+
+        Assert.Contains("class=\"cs-card cs-crud\"", html);
+        Assert.Contains("<h2>Book Catalog</h2>", html);
+        Assert.Contains("<th>Name</th>", html);
+        Assert.Contains("<td>Building Microservices</td>", html);
+    }
+
+    [Fact]
+    public void Crud_EmptyBlockRendersWhenItemsAreEmpty()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Crud Entity=\"Book\" Fields=\"BookTitle:Title\" Commands=\"AddBook:Add\" Items=\"{Binding Books}\"><cs:Column Name=\"BookTitle\" Header=\"Title\" /><cs:Empty><span>No books</span></cs:Empty></cs:Crud>",
+            new Dictionary<string, object?>
+            {
+                ["BookTitle"] = string.Empty,
+                ["Books"] = Array.Empty<object>()
+            });
+
+        Assert.Contains("class=\"cs-table-empty-row\"", html);
+        Assert.Contains("<span>No books</span>", html);
+        Assert.Contains("<th>Title</th>", html);
     }
 
     [Fact]
@@ -797,6 +917,18 @@ public class PageRendererTagTests
         Assert.Contains("role=\"dialog\"", html);
         Assert.Contains(" hidden", html);
         Assert.Contains("<h2>Edit Book</h2>", html);
+    }
+
+    [Fact]
+    public void Modal_Closable_RendersCloseButtonWithDataModalClose()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Modal Id=\"detail-modal\" Title=\"Book Details\" Closable=\"true\">Details</cs:Modal>",
+            new Dictionary<string, object?>());
+
+        Assert.Contains("<header class=\"cs-modal-header\">", html);
+        Assert.Contains("<h2>Book Details</h2>", html);
+        Assert.Contains("class=\"cs-modal-close\" data-modal-close aria-label=\"Close\"", html);
     }
 
     [Fact]
@@ -943,6 +1075,20 @@ public class PageRendererTagTests
     }
 
     [Fact]
+    public void Tree_EmptyTextRendersWhenItemsAreEmpty()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Tree Items=\"{Binding Nodes}\" EmptyText=\"{Binding Hint}\" />",
+            new Dictionary<string, object?>
+            {
+                ["Nodes"] = Array.Empty<object>(),
+                ["Hint"] = "No categories"
+            });
+
+        Assert.Contains("<li class=\"cs-empty\">No categories</li>", html);
+    }
+
+    [Fact]
     public void Tree_SingleNode_NoChildren()
     {
         var items = new[] { new { Label = "Only", Value = "1" } };
@@ -1064,6 +1210,88 @@ public class PageRendererTagTests
     }
 
     [Fact]
+    public void Repeater_EmptyBlock_RendersEmptyStateWithoutConditional()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Repeater Items=\"{Binding Items}\"><li>{Binding Name}</li><cs:Empty><p class=\"cs-empty\">No records</p></cs:Empty></cs:Repeater>",
+            new Dictionary<string, object?> { ["Items"] = Array.Empty<object>() });
+
+        Assert.Contains("<p class=\"cs-empty\">No records</p>", html);
+        Assert.DoesNotContain("<li>", html);
+    }
+
+    [Fact]
+    public void Repeater_EmptyText_UsesParentStateBinding()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Repeater Items=\"{Binding Items}\" EmptyText=\"{Binding EmptyHint}\"><li>{Binding Name}</li></cs:Repeater>",
+            new Dictionary<string, object?>
+            {
+                ["Items"] = Array.Empty<object>(),
+                ["EmptyHint"] = "No data available"
+            });
+
+        Assert.Contains("<p class=\"cs-empty\">No data available</p>", html);
+    }
+
+    [Fact]
+    public void Repeater_WithItems_IgnoresEmptyBlock()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Repeater Items=\"{Binding Items}\"><li>{Binding Name}</li><cs:Empty>No records</cs:Empty></cs:Repeater>",
+            new Dictionary<string, object?>
+            {
+                ["Items"] = new[] { new { Name = "Alice" } }
+            });
+
+        Assert.Contains("<li>Alice</li>", html);
+        Assert.DoesNotContain("No records", html);
+    }
+
+    [Fact]
+    public void Repeater_NestedEmptyBlock_DoesNotLeakToOuterRepeater()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Repeater Items=\"{Binding Groups}\"><div><cs:Repeater Items=\"{Binding Items}\"><span>{Binding Name}</span><cs:Empty>Nested empty</cs:Empty></cs:Repeater></div><cs:Empty>Outer empty</cs:Empty></cs:Repeater>",
+            new Dictionary<string, object?>
+            {
+                ["Groups"] = Array.Empty<object>()
+            });
+
+        Assert.Contains("Outer empty", html);
+        Assert.DoesNotContain("Nested empty", html);
+    }
+
+    [Fact]
+    public void Repeater_NestedRepeater_RendersItsOwnEmptyState()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Repeater Items=\"{Binding Groups}\"><div>{Binding Title}<cs:Repeater Items=\"{Binding Items}\"><span>{Binding Name}</span><cs:Empty>Nested empty</cs:Empty></cs:Repeater></div><cs:Empty>Outer empty</cs:Empty></cs:Repeater>",
+            new Dictionary<string, object?>
+            {
+                ["Groups"] = new[] { new { Title = "Group A", Items = Array.Empty<object>() } }
+            });
+
+        Assert.Contains("Group A", html);
+        Assert.Contains("Nested empty", html);
+        Assert.DoesNotContain("Outer empty", html);
+    }
+
+    [Fact]
+    public void Repeater_IndexAndCount_AvailableInItemTemplate()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Repeater Items=\"{Binding People}\"><li data-i=\"{Binding index}\" data-n=\"{Binding count}\">{Binding Name}</li></cs:Repeater>",
+            new Dictionary<string, object?>
+            {
+                ["People"] = new[] { new { Name = "Alice" }, new { Name = "Bob" } }
+            });
+
+        Assert.Contains("<li data-i=\"0\" data-n=\"2\">Alice</li>", html);
+        Assert.Contains("<li data-i=\"1\" data-n=\"2\">Bob</li>", html);
+    }
+
+    [Fact]
     public void Conditional_WhenBindingIsFalse_HidesContent()
     {
         var html = PageRenderer.RenderTemplateForTests(
@@ -1124,6 +1352,23 @@ public class PageRendererTagTests
         Assert.Contains("class=\"cs-pager\"", html);
         Assert.Contains("cs-pager-link", html);
         Assert.Contains("active", html);
+    }
+
+    [Fact]
+    public void Pager_LargeTotalPages_RendersWindowedPaginationWithEllipsis()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Pager Page=\"50\" TotalPages=\"100\" Url=\"/books?page={page}\" />",
+            new Dictionary<string, object?>());
+
+        Assert.Contains("class=\"cs-pager\"", html);
+        Assert.Contains("href=\"/books?page=1\"", html);
+        Assert.Contains("class=\"cs-pager-ellipsis\">&hellip;</span>", html);
+        Assert.Contains("href=\"/books?page=49\"", html);
+        Assert.Contains("href=\"/books?page=50\" aria-current=\"page\"", html);
+        Assert.Contains("href=\"/books?page=51\"", html);
+        Assert.Contains("href=\"/books?page=100\"", html);
+        Assert.DoesNotContain("href=\"/books?page=20\"", html);
     }
 
     [Fact]
