@@ -131,43 +131,12 @@ curl -s --max-time 10 "https://<preview-host>/.well-known/mcai-preview-connect-s
 - ✓ 预览或构建路径可复现。
 - ✓ 最终回复包含结果和验证事实。
 
-## 本轮执行记录
+## 最新执行记录
 
-- Date: 2026-06-27
-- .NET SDK: `10.0.301`
-- JS 验证: `node src/CodeSpirit.LibraryManagement/scripts/validate-js-boundary.js` 通过，58 个测试通过。
-- 测试验证: `dotnet test src/CodeSpirit.slnx --no-build` 通过，115 个测试通过。
-- 构建验证: `dotnet build src/CodeSpirit.slnx` 通过，存在 2 个 `IsPackable` warning。
-- 预览服务: 复用后台终端 `term_1782518571126_12`，端口 `8000`。
-- 预览地址: `https://8000-e190832bdf5b7286.monkeycode-ai.online`。
-- 预览入口: `/live-preview?dev=1` 支持 Dev Panel 实时编辑演示。
-- 预览检查: 预览连接状态检查通过。
-
-## VSIX 模板执行记录
-
-- Date: 2026-06-25
-- Snippet 注册: `src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj` 使用 `Snippets\*.snippet` 通配包含全部 snippet。
-- Snippet 覆盖: 已核对 `cstoolbar`、`cstabs`、`csmodal`、`cspager`、`csscripts`、`csscript`。
-- README 同步: 根 README、示例 README 和模板 README 的 VSIX 快捷方式表一致。
-- VSIX 构建: `dotnet build src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj` 通过，0 warning，0 error。
-
-## 场景识别完成记录
-
-- Date: 2026-06-25
-- 场景扩展: 已覆盖 `hr`、`manufacturing`、`hospitality`、`real-estate`、`legal`、`support`。
-- 主题 token: 已提供 `CodeSpirit.theme.exportTokens(root)` 和 `CodeSpirit.theme.tokens(root)`。
-- 低置信度调试: 已提供 `data-cs-scene-confidence`、`data-cs-scene-candidate`、`data-cs-scene-score`。
-- 文档勾选: `.monkeycode/docs` 和 `.monkeycode/specs` 中所有勾选项均已完成。
-- 文档结构: `.monkeycode/docs` 只保留 `unattended-development.md`，`.monkeycode/specs` 只保留 `project-spec.md`。
-- 同步验证: 源码与 VSIX 模板中的 `site.css`、`codespirit.intent.js` 完全一致。
-- JS 验证: `node src/CodeSpirit.LibraryManagement/scripts/validate-js-boundary.js` 通过。
-- 测试验证: `dotnet test src/CodeSpirit.slnx` 通过，77 个测试通过。
-- 构建验证: `dotnet build src/CodeSpirit.slnx` 通过，存在 2 个 `IsPackable` warning。
-- VSIX 构建: `dotnet build src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj` 通过，0 warning，0 error。
-
-## 勾选项复核记录
-
-- Date: 2026-06-27
-- 复核范围: `.monkeycode/docs/unattended-development.md`、`.monkeycode/specs/project-spec.md`、根 README 和模板 README。
-- 代码支撑: 已核对页面标签渲染、CSV 导入导出、默认样式、24 类场景、低置信度调试、主题 token、Dev Panel、LivePreview、VS Code snippets、VSIX snippets 和 README 同步。
-- 验证补强: `validate-js-boundary.js` 已覆盖 23 个 VS Code snippets、runtime 快捷 API、Dev Panel 资产、类型声明和模板清单。
+- Date: 2026-10-17
+- JS 验证: `node src/CodeSpirit.LibraryManagement/scripts/validate-js-boundary.js` 通过，61 个测试通过。
+- 测试验证: `dotnet test src/CodeSpirit.slnx` 通过，156 个测试通过。
+- 构建验证: `dotnet build src/CodeSpirit.slnx` 编译通过。
+- 页面标签增强: 完成 `cs:Repeater` 深度配对闭合与独立空态隔离，支持 `cs:Table` / `cs:Crud` / `cs:Tree` 空态与属性绑定。
+- 文档结构: `.monkeycode/docs` 保留 `unattended-development.md`，`.monkeycode/specs` 保留 `project-spec.md`。
+- 模板同步: 源码与 VSIX 模板目录下的 CSS、README 保持一致。
