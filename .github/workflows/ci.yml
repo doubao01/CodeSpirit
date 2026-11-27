@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('src/**/*.csproj', 'src/nuget.config') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Build framework packages
+        run: |
+          dotnet build src/CodeSpirit.Core/CodeSpirit.Core.csproj -c Release
+          dotnet build src/CodeSpirit.SourceGenerator/CodeSpirit.SourceGenerator.csproj -c Release
+          dotnet build src/CodeSpirit.Infrastructure/CodeSpirit.Infrastructure.csproj -c Release
+          dotnet build src/CodeSpirit.Modules/CodeSpirit.Modules.csproj -c Release
+
+      - name: Restore
+        run: dotnet restore src/CodeSpirit.slnx --force --no-cache
+
+      - name: Build
+        run: dotnet build src/CodeSpirit.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test src/CodeSpirit.slnx -c Release --no-build --logger "trx;LogFileName=results.trx"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate JS boundary
+        run: node src/CodeSpirit.LibraryManagement/scripts/validate-js-boundary.js
+
+  vsix:
+    name: Build VSIX
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('src/**/*.csproj', 'src/nuget.config') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore VSIX template
+        run: dotnet restore src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj
+
+      - name: Build VSIX
+        run: dotnet build src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj -c Release --no-restore
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codespirit-vsix
+          path: src/Templates/CodeSpiritVsixTemplate/**/*.vsix
+          if-no-files-found: error
+
+  pack:
+    name: Pack NuGet packages
+    runs-on: ubuntu-latest
+    needs: build-test
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('src/**/*.csproj', 'src/nuget.config') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Pack
+        run: |
+          dotnet build src/CodeSpirit.Core/CodeSpirit.Core.csproj -c Release
+          dotnet build src/CodeSpirit.SourceGenerator/CodeSpirit.SourceGenerator.csproj -c Release
+          dotnet build src/CodeSpirit.Infrastructure/CodeSpirit.Infrastructure.csproj -c Release
+          dotnet build src/CodeSpirit.Modules/CodeSpirit.Modules.csproj -c Release
+
+      - name: Upload NuGet artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: codespirit-nupkg
+          path: src/packages/*.nupkg
+          if-no-files-found: error

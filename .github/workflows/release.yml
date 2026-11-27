@@ -1,0 +1,249 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.2.0)'
+        required: true
+        type: string
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('src/**/*.csproj', 'src/nuget.config') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Build framework packages
+        run: |
+          dotnet build src/CodeSpirit.Core/CodeSpirit.Core.csproj -c Release
+          dotnet build src/CodeSpirit.SourceGenerator/CodeSpirit.SourceGenerator.csproj -c Release
+          dotnet build src/CodeSpirit.Infrastructure/CodeSpirit.Infrastructure.csproj -c Release
+          dotnet build src/CodeSpirit.Modules/CodeSpirit.Modules.csproj -c Release
+
+      - name: Build solution
+        run: |
+          dotnet restore src/CodeSpirit.slnx --force --no-cache
+          dotnet build src/CodeSpirit.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test src/CodeSpirit.slnx -c Release --no-build
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate JS boundary
+        run: node src/CodeSpirit.LibraryManagement/scripts/validate-js-boundary.js
+
+  package:
+    name: Pack release packages
+    runs-on: ubuntu-latest
+    needs: verify
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          VERSION="${VERSION#v}"
+          if [ -z "$VERSION" ]; then
+            echo "Unable to resolve version" >&2
+            exit 1
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $VERSION"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('src/**/*.csproj', 'src/nuget.config') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Pack at release version
+        shell: bash
+        run: |
+          OUT="$PWD/dist/nupkg"
+          mkdir -p "$OUT"
+          for project in \
+            src/CodeSpirit.Core/CodeSpirit.Core.csproj \
+            src/CodeSpirit.SourceGenerator/CodeSpirit.SourceGenerator.csproj \
+            src/CodeSpirit.Infrastructure/CodeSpirit.Infrastructure.csproj \
+            src/CodeSpirit.Modules/CodeSpirit.Modules.csproj; do
+            dotnet build "$project" -c Release \
+              -p:VersionPrefix=${{ steps.version.outputs.value }} \
+              -p:PackageOutputPath="$OUT"
+          done
+          ls -la "$OUT"
+
+      - name: Verify package versions
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          count=$(ls dist/nupkg/*.nupkg | wc -l)
+          if [ "$count" -ne 4 ]; then
+            echo "Expected 4 packages, found $count" >&2
+            exit 1
+          fi
+          for f in dist/nupkg/*.nupkg; do
+            case "$f" in
+              *".$VERSION.nupkg") ;;
+              *) echo "Unexpected package version: $f" >&2; exit 1 ;;
+            esac
+          done
+
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: dist/nupkg/*.nupkg
+          if-no-files-found: error
+
+  vsix:
+    name: Build VSIX
+    runs-on: windows-latest
+    needs: package
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Align template package version
+        shell: pwsh
+        run: |
+          $version = "${{ needs.package.outputs.version }}"
+          $csproj = "src/Templates/CodeSpiritVsixTemplate/ProjectTemplates/CodeSpirit.LibraryManagement/CodeSpirit.LibraryManagement.csproj"
+          $content = Get-Content $csproj -Raw
+          $pattern = '<CodeSpiritVersion Condition="''$(CodeSpiritVersion)'' == ''''>([^<]+)</CodeSpiritVersion>'
+          if ($content -notmatch $pattern) {
+            throw "Template CodeSpiritVersion default not found in $csproj"
+          }
+          $content = [regex]::Replace($content, $pattern, '<CodeSpiritVersion Condition="''$(CodeSpiritVersion)'' == ''''>' + $version + '</CodeSpiritVersion>')
+          Set-Content -Path $csproj -Value $content -NoNewline
+          Select-String -Path $csproj -SimpleMatch 'CodeSpiritVersion'
+
+      - name: Build VSIX
+        run: dotnet build src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj -c Release -p:VsixVersion=${{ needs.package.outputs.version }}
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: src/Templates/CodeSpiritVsixTemplate/**/*.vsix
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    runs-on: ubuntu-latest
+    needs: [package, vsix]
+    timeout-minutes: 15
+    env:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+
+    steps:
+      - name: Download NuGet packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nupkg
+          path: dist/assets
+
+      - name: Download VSIX
+        uses: actions/download-artifact@v4
+        with:
+          name: vsix
+          path: dist/vsix
+
+      - name: Collect assets
+        shell: bash
+        run: |
+          find dist/vsix -name '*.vsix' -exec cp {} dist/assets/ \;
+          ls -la dist/assets
+
+      - name: Prepare release notes
+        shell: bash
+        run: |
+          VERSION="${{ needs.package.outputs.version }}"
+          {
+            echo "## CodeSpirit $VERSION"
+            echo
+            echo "### NuGet packages"
+            echo
+            for f in dist/assets/*.nupkg; do echo "- \`$(basename "$f")\`"; done
+            echo
+            echo "### Visual Studio extension"
+            echo
+            for f in dist/assets/*.vsix; do echo "- \`$(basename "$f")\`"; done
+          } > dist/notes.md
+          cat dist/notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.package.outputs.version }}
+          name: CodeSpirit v${{ needs.package.outputs.version }}
+          body_path: dist/notes.md
+          files: dist/assets/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+      - name: Publish to NuGet.org
+        if: env.NUGET_API_KEY != ''
+        shell: bash
+        run: |
+          dotnet nuget push "dist/assets/CodeSpirit.*.nupkg" \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
