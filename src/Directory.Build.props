@@ -2,9 +2,9 @@
   <PropertyGroup>
     <VersionPrefix>0.1.0</VersionPrefix>
     <Authors>CodeSpirit</Authors>
-    <RepositoryUrl>https://github.com/SamHub1991/CodeSpirit</RepositoryUrl>
+    <RepositoryUrl>https://github.com/doubao01/CodeSpirit</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/SamHub1991/CodeSpirit</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/doubao01/CodeSpirit</PackageProjectUrl>
     <PackageTags>dotnet;aspnetcore;framework;spring-boot;convention-over-configuration</PackageTags>
     <GeneratePackageOnBuild Condition="'$(IsPackable)' != 'false'">true</GeneratePackageOnBuild>
     <PackageOutputPath>$(MSBuildThisFileDirectory)packages</PackageOutputPath>

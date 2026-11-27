@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <TargetFramework>net472</TargetFramework>
+    <GeneratePkgDefFile>false</GeneratePkgDefFile>
     <IncludeAssemblyInVSIXContainer>false</IncludeAssemblyInVSIXContainer>
     <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
     <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
@@ -9,7 +9,6 @@
     <CopyOutputSymbolsToOutputDirectory>false</CopyOutputSymbolsToOutputDirectory>
     <CreateVsixContainer>true</CreateVsixContainer>
     <DeployExtension>false</DeployExtension>
-    <VsixVersion>0.2.0</VsixVersion>
     <RootNamespace>CodeSpiritVsixTemplate</RootNamespace>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
@@ -18,10 +17,12 @@
     <None Include="source.extension.vsixmanifest">
       <SubType>Designer</SubType>
     </None>
-    <None Include="LICENSE.txt" />
-    <None Include="CodeSpiritSnippets.pkgdef">
+    <Content Include="LICENSE.txt">
       <IncludeInVSIX>true</IncludeInVSIX>
-    </None>
+    </Content>
+    <Content Include="CodeSpiritSnippets.pkgdef">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
     <Content Include="Resources\Icon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <IncludeInVSIX>true</IncludeInVSIX>
@@ -36,15 +37,38 @@
     </Content>
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Remove="ProjectTemplates\CodeSpirit.LibraryManagement\**\*.cs" />
-    <ProjectTemplate Include="ProjectTemplates\CodeSpirit.LibraryManagement\**\*" />
-  </ItemGroup>
+  <PropertyGroup>
+    <ProjectTemplateSourceDir>$(MSBuildProjectDirectory)\ProjectTemplates\CodeSpirit.LibraryManagement</ProjectTemplateSourceDir>
+    <ProjectTemplateZip>$(MSBuildProjectDirectory)\obj\CodeSpiritTemplate\CodeSpirit.LibraryManagement.zip</ProjectTemplateZip>
+    <GetVsixSourceItemsDependsOn>$(GetVsixSourceItemsDependsOn);PackageProjectTemplate</GetVsixSourceItemsDependsOn>
+  </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="ProjectTemplates\**\*.cs" />
+    <None Remove="ProjectTemplates\**" />
+    <Content Include="$(ProjectTemplateZip)" IncludeInVSIX="true" VSIXSubPath="ProjectTemplates" />
+  </ItemGroup>
+
+  <Target Name="PackageProjectTemplate" BeforeTargets="AssignTargetPaths">
+    <MakeDir Directories="$(MSBuildProjectDirectory)\obj\CodeSpiritTemplate" />
+    <ZipDirectory SourceDirectory="$(ProjectTemplateSourceDir)"
+                  DestinationFile="$(ProjectTemplateZip)"
+                  Overwrite="true" />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.8.2365">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+
+  <PropertyGroup>
+    <VsSDKTargetsPath>$(PkgMicrosoft_VSSDK_BuildTools)\tools\vssdk\Microsoft.VsSDK.targets</VsSDKTargetsPath>
+    <CustomAfterMicrosoftCommonTargets Condition="$([MSBuild]::IsOSPlatform('Windows')) and Exists('$(VsSDKTargetsPath)')">$(VsSDKTargetsPath)</CustomAfterMicrosoftCommonTargets>
+  </PropertyGroup>
 </Project>

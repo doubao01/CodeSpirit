@@ -77,6 +77,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
@@ -89,7 +92,34 @@ jobs:
         run: dotnet restore src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj
 
       - name: Build VSIX
-        run: dotnet build src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj -c Release --no-restore
+        run: msbuild src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj /p:Configuration=Release /p:DeployExtension=false /v:minimal
+
+      - name: Verify VSIX output
+        shell: pwsh
+        run: |
+          $vsix = Get-ChildItem src/Templates/CodeSpiritVsixTemplate -Recurse -Filter *.vsix | Select-Object -First 1
+          if (-not $vsix) { throw "No .vsix produced by the build" }
+          Write-Host "VSIX: $($vsix.FullName)"
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($vsix.FullName)
+          try {
+            $names = $zip.Entries | ForEach-Object { $_.FullName }
+            $required = @(
+              'extension.vsixmanifest',
+              'CodeSpiritSnippets.pkgdef',
+              'ProjectTemplates/CodeSpirit.LibraryManagement.zip'
+            )
+            foreach ($entry in $required) {
+              if ($names -notcontains $entry) { throw "VSIX is missing $entry" }
+            }
+            $snippets = $names | Where-Object { $_ -like 'Snippets/*.snippet' }
+            if (-not $snippets) { throw "VSIX contains no snippet files" }
+            Write-Host "VSIX contains $($names.Count) entries and $($snippets.Count) snippets"
+          }
+          finally {
+            $zip.Dispose()
+          }
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
