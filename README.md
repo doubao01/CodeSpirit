@@ -26,13 +26,13 @@ dotnet run
 
 ### 使用 Visual Studio VSIX
 
-在 Windows 上用 Visual Studio 的 MSBuild 构建：
+任意平台用 .NET SDK 构建：
 
-```powershell
-msbuild src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj /p:Configuration=Release
+```bash
+dotnet build src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj -c Release
 ```
 
-产物位于 `src/Templates/CodeSpiritVsixTemplate/bin/Release/net472/CodeSpiritVsixTemplate.vsix`，安装后在 Visual Studio 新建项目中搜索 `CodeSpirit`。VSIX 打包依赖 .NET Framework 版 VSSDK 任务，只能在 Windows 上完成；Linux/macOS 上该工程仅编译，不产出 `.vsix`。
+产物位于 `src/Templates/CodeSpiritVsixTemplate/bin/Release/net472/CodeSpiritVsixTemplate.vsix`，安装后在 Visual Studio 新建项目中搜索 `CodeSpirit`。打包过程使用 MSBuild 的 `ZipDirectory` 组装 VSIX，按 `[Content_Types].xml` 与 manifest 填充条目，因此不依赖只支持 Windows 的 VSSDK 任务。
 
 ## 框架能力
 
@@ -282,10 +282,10 @@ GitHub Actions 定义在 `.github/workflows/`：
 
 | 工作流 | 触发 | 内容 |
 |--------|------|------|
-| `ci.yml` | push/PR 到 main，手动 | Linux 构建+测试+JS 边界校验，Windows 用 MSBuild 构建 VSIX，打包 NuGet artifacts |
-| `release.yml` | 推送 `v*` tag，手动指定版本 | 校验、按版本打包、同步 VSIX 版本并在 Windows 构建、创建 GitHub Release 并上传所有产物，可选推送 NuGet.org |
+| `ci.yml` | push/PR 到 main，手动 | Linux 构建+测试+JS 边界校验，构建并校验 VSIX，打包 NuGet artifacts |
+| `release.yml` | 推送 `v*` tag，手动指定版本 | 校验、按版本打包、同步 VSIX 版本并构建、创建 GitHub Release 并上传所有产物，可选推送 NuGet.org |
 
-VSIX 任务使用 `microsoft/setup-msbuild` 提供的 MSBuild；`dotnet build` 在 Windows 上不保证创建 VSIX 容器，因此 CI 与 Release 都走 `msbuild` 并校验产物存在。
+VSIX 由 `dotnet build` 直接产出；CI 与 Release 都会用 `src/Templates/CodeSpiritVsixTemplate/verify-vsix.py` 校验包内条目与 manifest 声明一致。
 
 发布步骤：
 

@@ -16,4 +16,5 @@
   <Default Extension="md" ContentType="text/plain" />
   <Default Extension="xml" ContentType="text/xml" />
   <Default Extension="txt" ContentType="text/plain" />
+  <Default Extension="zip" ContentType="application/zip" />
 </Types>

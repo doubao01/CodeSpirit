@@ -190,31 +190,7 @@ jobs:
         run: msbuild src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj /p:Configuration=Release /p:DeployExtension=false /v:minimal
 
       - name: Verify VSIX output
-        shell: pwsh
-        run: |
-          $vsix = Get-ChildItem src/Templates/CodeSpiritVsixTemplate -Recurse -Filter *.vsix | Select-Object -First 1
-          if (-not $vsix) { throw "No .vsix produced by the build" }
-          Write-Host "VSIX: $($vsix.FullName)"
-
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $zip = [System.IO.Compression.ZipFile]::OpenRead($vsix.FullName)
-          try {
-            $names = $zip.Entries | ForEach-Object { $_.FullName }
-            $required = @(
-              'extension.vsixmanifest',
-              'CodeSpiritSnippets.pkgdef',
-              'ProjectTemplates/CodeSpirit.LibraryManagement.zip'
-            )
-            foreach ($entry in $required) {
-              if ($names -notcontains $entry) { throw "VSIX is missing $entry" }
-            }
-            $snippets = $names | Where-Object { $_ -like 'Snippets/*.snippet' }
-            if (-not $snippets) { throw "VSIX contains no snippet files" }
-            Write-Host "VSIX contains $($names.Count) entries and $($snippets.Count) snippets"
-          }
-          finally {
-            $zip.Dispose()
-          }
+        run: python3 src/Templates/CodeSpiritVsixTemplate/verify-vsix.py src/Templates/CodeSpiritVsixTemplate/bin/Release/net472/CodeSpiritVsixTemplate.vsix
 
       - name: Upload VSIX
         uses: actions/upload-artifact@v4
