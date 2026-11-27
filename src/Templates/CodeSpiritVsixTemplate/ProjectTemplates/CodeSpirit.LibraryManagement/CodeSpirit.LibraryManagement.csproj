@@ -1,9 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <PropertyGroup>
+    <CodeSpiritVersion Condition="'$(CodeSpiritVersion)' == ''">0.1.0</CodeSpiritVersion>
+  </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="CodeSpirit.Core" Version="0.1.0" />
-    <PackageReference Include="CodeSpirit.Infrastructure" Version="0.1.0" />
-    <PackageReference Include="CodeSpirit.SourceGenerator" Version="0.1.0"
+    <PackageReference Include="CodeSpirit.Core" Version="$(CodeSpiritVersion)" />
+    <PackageReference Include="CodeSpirit.Infrastructure" Version="$(CodeSpiritVersion)" />
+    <PackageReference Include="CodeSpirit.SourceGenerator" Version="$(CodeSpiritVersion)"
       OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 

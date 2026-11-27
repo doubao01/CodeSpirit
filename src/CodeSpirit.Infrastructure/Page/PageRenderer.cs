@@ -1229,7 +1229,9 @@ public class PageRenderer
         var source = GetAttribute(rawAttributes, "Source");
         var sourceField = GetAttribute(rawAttributes, "SourceField");
         var options = GetAttribute(rawAttributes, "Options");
-        var commonAttributes = RenderHtmlAttributes(rawAttributes, state, "Name", "Label", "Type", "Rows", "Id", "Placeholder", "Source", "SourceField", "Options");
+        var validation = BuildFieldValidation(rawAttributes, type);
+        var commonAttributes = RenderHtmlAttributes(rawAttributes, state, "Name", "Label", "Type", "Rows", "Id", "Placeholder", "Source", "SourceField", "Options",
+            "Required", "MinLength", "MaxLength", "Min", "Max", "Pattern", "Validate", "Message", "Error", "ValidateWhen");
         var rawVal = GetValue(state, name);
         var inputValue = Html(FormatValue(rawVal, null));
 
@@ -1237,7 +1239,7 @@ public class PageRenderer
         {
             var rowsAttribute = string.IsNullOrWhiteSpace(rows) ? string.Empty : $" rows=\"{Html(RenderBindings(rows, state))}\"";
             var placeholderAttribute = string.IsNullOrWhiteSpace(placeholder) ? string.Empty : $" placeholder=\"{Html(RenderBindings(placeholder, state))}\"";
-            return $"<label for=\"{Html(id)}\">{Html(label)}<textarea id=\"{Html(id)}\" name=\"{Html(name)}\" data-cs-bind=\"{Html(name)}\"{rowsAttribute}{placeholderAttribute}{commonAttributes}>{inputValue}</textarea></label>";
+            return $"<label for=\"{Html(id)}\">{Html(label)}<textarea id=\"{Html(id)}\" name=\"{Html(name)}\" data-cs-bind=\"{Html(name)}\"{rowsAttribute}{placeholderAttribute}{validation}{commonAttributes}>{inputValue}</textarea></label>";
         }
 
         if (type.Equals("select", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(source) || !string.IsNullOrWhiteSpace(options))
@@ -1266,18 +1268,89 @@ public class PageRenderer
                 }
             }
 
-            return $"<label for=\"{Html(id)}\">{Html(label)}<select id=\"{Html(id)}\" name=\"{Html(name)}\" data-cs-bind=\"{Html(name)}\"{sourceAttr}{sourceFieldAttr}{commonAttributes}>{optionsSb}</select></label>";
+            return $"<label for=\"{Html(id)}\">{Html(label)}<select id=\"{Html(id)}\" name=\"{Html(name)}\" data-cs-bind=\"{Html(name)}\"{sourceAttr}{sourceFieldAttr}{validation}{commonAttributes}>{optionsSb}</select></label>";
         }
 
         if (type.Equals("checkbox", StringComparison.OrdinalIgnoreCase))
         {
             var isChecked = IsTruthy(rawVal);
             var checkedAttr = isChecked ? " checked" : string.Empty;
-            return $"<label for=\"{Html(id)}\" class=\"cs-checkbox\"><input id=\"{Html(id)}\" type=\"checkbox\" name=\"{Html(name)}\" value=\"true\" data-cs-bind=\"{Html(name)}\"{checkedAttr}{commonAttributes} /><span>{Html(label)}</span></label>";
+            return $"<label for=\"{Html(id)}\" class=\"cs-checkbox\"><input id=\"{Html(id)}\" type=\"checkbox\" name=\"{Html(name)}\" value=\"true\" data-cs-bind=\"{Html(name)}\"{checkedAttr}{validation}{commonAttributes} /><span>{Html(label)}</span></label>";
         }
 
         var placeholderInput = string.IsNullOrWhiteSpace(placeholder) ? string.Empty : $" placeholder=\"{Html(RenderBindings(placeholder, state))}\"";
-        return $"<label for=\"{Html(id)}\">{Html(label)}<input id=\"{Html(id)}\" type=\"{Html(type)}\" name=\"{Html(name)}\" value=\"{inputValue}\" data-cs-bind=\"{Html(name)}\"{placeholderInput}{commonAttributes} /></label>";
+        return $"<label for=\"{Html(id)}\">{Html(label)}<input id=\"{Html(id)}\" type=\"{Html(type)}\" name=\"{Html(name)}\" value=\"{inputValue}\" data-cs-bind=\"{Html(name)}\"{placeholderInput}{validation}{commonAttributes} /></label>";
+    }
+
+    private static string BuildFieldValidation(string rawAttributes, string type)
+    {
+        var rules = new List<string>();
+        var required = (GetAttribute(rawAttributes, "Required") ?? string.Empty).Trim();
+        var isRequired = string.Equals(required, "true", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(required, "required", StringComparison.OrdinalIgnoreCase);
+
+        if (isRequired)
+            rules.Add("required");
+
+        AddRangeRule(rules, "minLength", GetAttribute(rawAttributes, "MinLength"));
+        AddRangeRule(rules, "maxLength", GetAttribute(rawAttributes, "MaxLength"));
+        AddRangeRule(rules, "min", GetAttribute(rawAttributes, "Min"));
+        AddRangeRule(rules, "max", GetAttribute(rawAttributes, "Max"));
+
+        var inferred = type.Trim().ToLowerInvariant() switch
+        {
+            "email" => "email",
+            "url" => "url",
+            "tel" => "tel",
+            "number" => "numeric",
+            _ => null
+        };
+        if (inferred is not null)
+            rules.Add(inferred);
+
+        var validate = GetAttribute(rawAttributes, "Validate");
+        if (!string.IsNullOrWhiteSpace(validate))
+        {
+            foreach (var token in validate.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var rule = token.ToLowerInvariant();
+                if (rule is "email" or "url" or "numeric" or "integer" or "phone" or "tel" && !rules.Contains(rule))
+                    rules.Add(rule);
+            }
+        }
+
+        var builder = new StringBuilder();
+        if (isRequired)
+            builder.Append(" aria-required=\"true\"");
+
+        if (rules.Count > 0)
+            builder.Append(" data-cs-rule=\"").Append(Html(string.Join(' ', rules))).Append('"');
+
+        var pattern = GetAttribute(rawAttributes, "Pattern");
+        if (!string.IsNullOrWhiteSpace(pattern))
+            builder.Append(" data-cs-pattern=\"").Append(Html(pattern)).Append('"');
+
+        var message = GetAttribute(rawAttributes, "Message") ?? GetAttribute(rawAttributes, "Error");
+        if (!string.IsNullOrWhiteSpace(message))
+            builder.Append(" data-cs-message=\"").Append(Html(message)).Append('"');
+
+        var validateWhen = GetAttribute(rawAttributes, "ValidateWhen");
+        if (!string.IsNullOrWhiteSpace(validateWhen))
+            builder.Append(" data-cs-validate-when=\"").Append(Html(validateWhen.Trim())).Append('"');
+
+        return builder.ToString();
+    }
+
+    private static void AddRangeRule(List<string> rules, string name, string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+            return;
+
+        var value = rawValue.Trim();
+        if (value.Length == 0)
+            return;
+
+        rules.Add($"{name}:{value}");
     }
 
     private static string RenderCrudField(CrudField field, IReadOnlyDictionary<string, object?> state)

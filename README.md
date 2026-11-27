@@ -106,6 +106,30 @@ public class CustomerViewModel : ViewModel
 <cs:Table Items="{Binding Customers}" Columns="Id:Id,Name:Name,Status:Status" />
 ```
 
+`<cs:Field>` 可直接声明验证规则，运行时在提交前自动校验：
+
+```html
+<cs:Form>
+  <cs:Field Name="Email" Label="Email" Type="email" Required="true" />
+  <cs:Field Name="Age" Label="Age" Type="number" Min="18" Max="65" Message="年龄需在 18 到 65 之间" />
+  <cs:Field Name="Code" Label="Code" Required="true" MinLength="2" MaxLength="6" Pattern="^[A-Z]+$" />
+  <cs:Button Command="Save">Save</cs:Button>
+</cs:Form>
+```
+
+| 属性 | 输出 | 说明 |
+|------|------|------|
+| `Required="true"` | `aria-required="true" data-cs-rule="required"` | 必填 |
+| `MinLength` / `MaxLength` | `minLength:N` / `maxLength:N` | 字符串长度 |
+| `Min` / `Max` | `min:N` / `max:N` | 数值范围 |
+| `Pattern` | `data-cs-pattern="..."` | 正则校验 |
+| `Message` / `Error` | `data-cs-message="..."` | 自定义错误文案 |
+| `Validate` | 追加 `email url tel numeric integer phone` token | 显式规则 |
+| `ValidateWhen` | `data-cs-validate-when="AddBook, UpdateBook"` | 仅在指定命令提交时校验，支持 `!Command` 排除 |
+| `Type="email\|url\|tel\|number"` | 自动推断 `email` / `url` / `tel` / `numeric` | 类型推断 |
+
+表单内存在 `data-cs-rule` 时，提交会自动校验并阻止无效提交；输入时自动清除当前字段错误。多个命令共用一个表单时，用 `ValidateWhen` 把规则限定到相关命令，其他命令不会误报。设置 `data-cs-validate="false"` 可关闭自动校验。服务端返回的错误仍通过 `CodeSpirit.applyErrors` 渲染。
+
 ASPX 渲染支持嵌套绑定路径和列表索引，例如 `{Binding User.Profile.Name}`、`{Binding Books[0].Title}`。`<cs:Repeater>` 内可以继续使用 `<cs:Card>`、`<cs:Show>` 等 CodeSpirit 组件，子模板会使用当前 item 状态渲染。
 
 ## 内置前端边界
@@ -246,6 +270,36 @@ CodeSpirit.LibraryManagement/
 ├── scripts/
 ├── Program.cs
 └── appsettings.json
+```
+
+## CI/CD 流水线
+
+GitHub Actions 定义在 `.github/workflows/`：
+
+| 工作流 | 触发 | 内容 |
+|--------|------|------|
+| `ci.yml` | push/PR 到 main，手动 | Linux 构建+测试+JS 边界校验，Windows 构建 VSIX，打包 NuGet artifacts |
+| `release.yml` | 推送 `v*` tag，手动指定版本 | 校验、按版本打包、构建 VSIX、创建 GitHub Release 并上传所有产物，可选推送 NuGet.org |
+
+发布步骤：
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+Release 会产出 4 个 NuGet 包和 1 个 `.vsix`。如需自动推送到 NuGet.org，在仓库 Secrets 中配置 `NUGET_API_KEY`。
+
+本地复现 CI 构建顺序（`local` NuGet 源需要先有包）：
+
+```bash
+dotnet build src/CodeSpirit.Core/CodeSpirit.Core.csproj -c Release
+dotnet build src/CodeSpirit.SourceGenerator/CodeSpirit.SourceGenerator.csproj -c Release
+dotnet build src/CodeSpirit.Infrastructure/CodeSpirit.Infrastructure.csproj -c Release
+dotnet build src/CodeSpirit.Modules/CodeSpirit.Modules.csproj -c Release
+dotnet restore src/CodeSpirit.slnx --force --no-cache
+dotnet build src/CodeSpirit.slnx -c Release --no-restore
+dotnet test src/CodeSpirit.slnx -c Release --no-build
 ```
 
 ## 验证命令

@@ -174,6 +174,18 @@
     return submitter.getAttribute('data-cs-command') || (submitter.name === '__command' ? submitter.value : null);
   }
 
+  function resolveCommand(form, submitter) {
+    var command = readCommand(submitter);
+    if (command) {
+      return command;
+    }
+    if (!form || !form.querySelectorAll) {
+      return null;
+    }
+    var buttons = form.querySelectorAll('[data-cs-command]');
+    return buttons.length === 1 ? buttons[0].getAttribute('data-cs-command') : null;
+  }
+
   function updateField(root, name, value) {
     if (!root || !name) {
       return;
@@ -379,6 +391,183 @@
     });
   }
 
+  function evaluateFieldRules(value, fieldRules, chain, field) {
+    if (value === undefined) {
+      value = null;
+    }
+
+    if (fieldRules.required && (value == null || String(value).trim() === NULL_VALUE)) {
+      return fieldRules.message || 'This field is required';
+    }
+
+    var isEmpty = value == null || String(value).trim() === NULL_VALUE;
+    if (isEmpty) {
+      return null;
+    }
+
+    if (fieldRules.minLength != null && String(value).length < fieldRules.minLength) {
+      return fieldRules.message || ('Must be at least ' + fieldRules.minLength + ' characters');
+    }
+
+    if (fieldRules.maxLength != null && String(value).length > fieldRules.maxLength) {
+      return fieldRules.message || ('Must be at most ' + fieldRules.maxLength + ' characters');
+    }
+
+    if (fieldRules.pattern) {
+      var pattern = typeof fieldRules.pattern === 'string' ? new RegExp(fieldRules.pattern) : fieldRules.pattern;
+      if (!pattern.test(String(value))) {
+        return fieldRules.message || 'Invalid format';
+      }
+    }
+
+    if (fieldRules.email && !/^\S+@\S+\.\S+$/.test(String(value))) {
+      return fieldRules.message || 'Must be a valid email address';
+    }
+
+    if (fieldRules.url && !/^https?:\/\/\S+$/i.test(String(value).trim())) {
+      return fieldRules.message || 'Must be a valid URL';
+    }
+
+    if (fieldRules.numeric && !/^-?\d+(\.\d+)?$/.test(String(value).trim())) {
+      return fieldRules.message || 'Must be numeric';
+    }
+
+    if (fieldRules.integer && !/^-?\d+$/.test(String(value).trim())) {
+      return fieldRules.message || 'Must be an integer';
+    }
+
+    if ((fieldRules.phone || fieldRules.tel) && !/^[+]?[\d\s-]{7,20}$/.test(String(value).trim())) {
+      return fieldRules.message || 'Must be a valid phone number';
+    }
+
+    if (fieldRules.min != null && parseFloat(value) < fieldRules.min) {
+      return fieldRules.message || ('Must be at least ' + fieldRules.min);
+    }
+
+    if (fieldRules.max != null && parseFloat(value) > fieldRules.max) {
+      return fieldRules.message || ('Must be at most ' + fieldRules.max);
+    }
+
+    if (fieldRules.matches) {
+      var targetVal = chain ? chain.get(fieldRules.matches) : null;
+      if (String(value) !== String(targetVal)) {
+        return fieldRules.message || ('Must match ' + fieldRules.matches);
+      }
+    }
+
+    for (var customRule in _customValidators) {
+      if (Object.prototype.hasOwnProperty.call(_customValidators, customRule) && fieldRules[customRule]) {
+        var ruleResult = _customValidators[customRule](value, fieldRules[customRule], field, chain);
+        if (ruleResult !== true) {
+          return fieldRules.message || (typeof ruleResult === 'string' ? ruleResult : 'Invalid value');
+        }
+      }
+    }
+
+    if (fieldRules.custom && typeof fieldRules.custom === 'function') {
+      var customResult = fieldRules.custom(value, field);
+      if (customResult !== true) {
+        return typeof customResult === 'string' ? customResult : 'Invalid value';
+      }
+    }
+
+    return null;
+  }
+
+  function declarativeRules(form) {
+    var result = {};
+    if (!form || !form.querySelectorAll) {
+      return result;
+    }
+
+    form.querySelectorAll('[data-cs-rule]').forEach(function (el) {
+      var name = el.name || el.getAttribute('data-cs-bind');
+      if (!name) {
+        return;
+      }
+
+      var rules = result[name] || {};
+      String(el.getAttribute('data-cs-rule') || '').split(/\s+/).forEach(function (token) {
+        if (!token) {
+          return;
+        }
+
+        var parts = token.split(':');
+        var ruleName = parts[0];
+        var ruleValue = parts.length > 1 ? parts.slice(1).join(':') : true;
+
+        if (ruleName === 'minLength' || ruleName === 'maxLength' || ruleName === 'min' || ruleName === 'max') {
+          var numeric = parseFloat(ruleValue);
+          rules[ruleName] = isNaN(numeric) ? ruleValue : numeric;
+          return;
+        }
+
+        if (ruleName === 'pattern') {
+          rules.pattern = ruleValue;
+          return;
+        }
+
+        rules[ruleName] = ruleValue;
+      });
+
+      var message = el.getAttribute('data-cs-message');
+      var pattern = el.getAttribute('data-cs-pattern');
+      if (pattern) {
+        rules.pattern = pattern;
+      }
+      if (message) {
+        rules.message = message;
+      }
+
+      var when = el.getAttribute('data-cs-validate-when');
+      if (when && String(when).trim()) {
+        rules.__when = String(when).split(/[\s,]+/).filter(Boolean);
+      }
+
+      result[name] = rules;
+    });
+
+    return result;
+  }
+
+  function shouldValidateField(fieldRules, command) {
+    var when = fieldRules && fieldRules.__when;
+    if (!when || !when.length) {
+      return true;
+    }
+
+    var hasCommand = command != null && String(command).trim() !== '';
+    if (when.indexOf('*') >= 0) {
+      return true;
+    }
+
+    var hasIncludeTokens = false;
+    var included = false;
+    var excluded = false;
+    when.forEach(function (token) {
+      var name = String(token).trim();
+      if (!name) {
+        return;
+      }
+      if (name.charAt(0) === '!') {
+        if (hasCommand && name.slice(1) === String(command)) {
+          excluded = true;
+        }
+        return;
+      }
+      hasIncludeTokens = true;
+      if (hasCommand && name === String(command)) {
+        included = true;
+      }
+    });
+
+    if (excluded) {
+      return false;
+    }
+
+    return hasIncludeTokens ? included : true;
+  }
+
   function applyErrors(root, errors) {
     clearErrors(root);
     if (!errors) {
@@ -392,10 +581,17 @@
       root.querySelectorAll(selector('name', fieldName) + ', ' + selector('data-cs-bind', fieldName)).forEach(function (el) {
         matched = true;
         el.classList.add('cs-invalid');
-        var summary = el.closest('label') || el.parentElement;
+        if (el.setAttribute) {
+          el.setAttribute('aria-invalid', 'true');
+        }
+        var summary = el.closest('label') || el.parentElement || el.parentNode;
+        if (summary && summary.classList) {
+          summary.classList.add('cs-has-error');
+        }
         if (summary && !summary.querySelector('.cs-error')) {
           var span = document.createElement('span');
-          span.className = 'cs-error';
+          span.setAttribute('class', 'cs-error');
+          span.setAttribute('role', 'alert');
           span.textContent = message;
           summary.appendChild(span);
         }
@@ -410,7 +606,7 @@
       var summary = root.querySelector('.cs-error-summary');
       if (!summary) {
         summary = document.createElement('div');
-        summary.className = 'cs-error-summary';
+        summary.setAttribute('class', 'cs-error-summary');
         summary.setAttribute('role', 'alert');
         root.appendChild(summary);
       }
@@ -418,7 +614,7 @@
       summary.innerHTML = '';
       summaryMessages.forEach(function (message) {
         var item = document.createElement('div');
-        item.className = 'cs-error-summary-item';
+        item.setAttribute('class', 'cs-error-summary-item');
         item.textContent = message;
         summary.appendChild(item);
       });
@@ -432,13 +628,18 @@
     root.classList.remove('cs-has-errors');
     root.querySelectorAll('.cs-invalid').forEach(function (el) {
       el.classList.remove('cs-invalid');
+      if (el.removeAttribute) {
+        el.removeAttribute('aria-invalid');
+      }
     });
-    root.querySelectorAll('.cs-error').forEach(function (el) {
-      el.remove();
-    });
-    root.querySelectorAll('.cs-error-summary').forEach(function (el) {
-      el.remove();
-    });
+    root.querySelectorAll('.cs-error').forEach(removeElement);
+    root.querySelectorAll('.cs-error-summary').forEach(removeElement);
+  }
+
+  function removeElement(el) {
+    if (el && el.parentNode) {
+      el.parentNode.removeChild(el);
+    }
   }
 
   function setLoading(form, isLoading, submitter) {
@@ -529,10 +730,14 @@
     }
 
     event.preventDefault();
+    var command = resolveCommand(form, submitter);
+    if (form.getAttribute('data-cs-validate') !== 'false' && !vm(form).validate(null, command)) {
+      return;
+    }
+
     var payload = serializeForm(form);
     setLoading(form, true, submitter);
     clearErrors(form);
-    var command = readCommand(submitter);
     if (command) {
       payload.__command = command;
     } else if (submitter && submitter.name) {
@@ -574,9 +779,41 @@
     var value = detail.value != null ? detail.value : readInputEventValue(target);
 
     updateField(root, name, value);
+    clearFieldError(root, target, name);
     if (root && name) {
       emit(root, 'codespirit:changed', { name: name, value: value });
     }
+  }
+
+  function clearFieldError(root, target, name) {
+    if (!root) {
+      return;
+    }
+
+    var scope = target && target.closest ? target.closest('label') : null;
+    var elements = [];
+    if (scope) {
+      elements.push(scope);
+    }
+    root.querySelectorAll(selector('name', name) + ', ' + selector('data-cs-bind', name)).forEach(function (el) {
+      var label = el.closest ? el.closest('label') : null;
+      if (label && elements.indexOf(label) < 0) {
+        elements.push(label);
+      }
+    });
+
+    elements.forEach(function (label) {
+      label.querySelectorAll('.cs-error').forEach(removeElement);
+      label.querySelectorAll('.cs-invalid').forEach(function (el) {
+        el.classList.remove('cs-invalid');
+        if (el.removeAttribute) {
+          el.removeAttribute('aria-invalid');
+        }
+      });
+      if (label.classList) {
+        label.classList.remove('cs-has-error');
+      }
+    });
   }
 
   function readInputEventValue(target) {
@@ -836,127 +1073,39 @@
       return this;
     },
 
-    validate: function (rules) {
+    validate: function (rules, command) {
       this._checkDestroyed();
+      var self = this;
       clearErrors(this._form);
-      if (!rules) {
-        return true;
+
+      var allRules = {};
+      var declared = declarativeRules(this._form);
+      Object.keys(declared).forEach(function (field) {
+        allRules[field] = declared[field];
+      });
+      if (rules) {
+        Object.keys(rules).forEach(function (field) {
+          allRules[field] = rules[field];
+        });
       }
 
-      var self = this;
-      var valid = true;
       var errors = {};
-      Object.keys(rules).forEach(function (field) {
-        var fieldRules = rules[field];
-        var value = self.get(field);
-        if (value === undefined) {
-          value = null;
-        }
-
-        if (fieldRules.required && (value == null || String(value).trim() === NULL_VALUE)) {
-          errors[field] = fieldRules.message || (field + ' is required');
-          valid = false;
+      Object.keys(allRules).forEach(function (field) {
+        if (!shouldValidateField(allRules[field], command)) {
           return;
         }
-
-        if (fieldRules.minLength != null && String(value || '').length < fieldRules.minLength) {
-          errors[field] = fieldRules.message || (field + ' must be at least ' + fieldRules.minLength + ' characters');
-          valid = false;
-          return;
-        }
-
-        if (fieldRules.maxLength != null && String(value || '').length > fieldRules.maxLength) {
-          errors[field] = fieldRules.message || (field + ' must be at most ' + fieldRules.maxLength + ' characters');
-          valid = false;
-          return;
-        }
-
-        if (fieldRules.pattern) {
-          var pattern = typeof fieldRules.pattern === 'string' ? new RegExp(fieldRules.pattern) : fieldRules.pattern;
-          if (!pattern.test(String(value || ''))) {
-            errors[field] = fieldRules.message || (field + ' is invalid');
-            valid = false;
-            return;
-          }
-        }
-
-        if (fieldRules.email && !/^\S+@\S+\.\S+$/.test(String(value || ''))) {
-          errors[field] = fieldRules.message || (field + ' is invalid');
-          valid = false;
-          return;
-        }
-
-        if (fieldRules.url && !/^https?:\/\/\S+$/i.test(String(value || '').trim())) {
-          errors[field] = fieldRules.message || (field + ' must be a valid URL');
-          valid = false;
-          return;
-        }
-
-        if (fieldRules.numeric && !/^-?\d+(\.\d+)?$/.test(String(value || '').trim())) {
-          errors[field] = fieldRules.message || (field + ' must be numeric');
-          valid = false;
-          return;
-        }
-
-        if (fieldRules.integer && !/^-?\d+$/.test(String(value || '').trim())) {
-          errors[field] = fieldRules.message || (field + ' must be an integer');
-          valid = false;
-          return;
-        }
-
-        if ((fieldRules.phone || fieldRules.tel) && !/^[+]?[\d\s-]{7,20}$/.test(String(value || '').trim())) {
-          errors[field] = fieldRules.message || (field + ' must be a valid phone number');
-          valid = false;
-          return;
-        }
-
-        if (fieldRules.min != null && parseFloat(value) < fieldRules.min) {
-          errors[field] = fieldRules.message || (field + ' must be at least ' + fieldRules.min);
-          valid = false;
-          return;
-        }
-
-        if (fieldRules.max != null && parseFloat(value) > fieldRules.max) {
-          errors[field] = fieldRules.message || (field + ' must be at most ' + fieldRules.max);
-          valid = false;
-          return;
-        }
-
-        if (fieldRules.matches) {
-          var targetVal = self.get(fieldRules.matches);
-          if (value !== targetVal) {
-            errors[field] = fieldRules.message || (field + ' does not match ' + fieldRules.matches);
-            valid = false;
-            return;
-          }
-        }
-
-        for (var customRule in _customValidators) {
-          if (Object.prototype.hasOwnProperty.call(_customValidators, customRule) && fieldRules[customRule]) {
-            var ruleResult = _customValidators[customRule](value, fieldRules[customRule], field, self);
-            if (ruleResult !== true) {
-              errors[field] = fieldRules.message || (typeof ruleResult === 'string' ? ruleResult : (field + ' is invalid'));
-              valid = false;
-              return;
-            }
-          }
-        }
-
-        if (fieldRules.custom && typeof fieldRules.custom === 'function') {
-          var customResult = fieldRules.custom(value, field);
-          if (customResult !== true) {
-            errors[field] = typeof customResult === 'string' ? customResult : (field + ' is invalid');
-            valid = false;
-            return;
-          }
+        var message = evaluateFieldRules(self.get(field), allRules[field], self, field);
+        if (message) {
+          errors[field] = message;
         }
       });
 
-      if (!valid) {
+      if (Object.keys(errors).length) {
         applyErrors(this._form, errors);
+        return false;
       }
 
-      return valid;
+      return true;
     },
 
     observe: function (fields, callback) {
@@ -1065,6 +1214,25 @@
   window.CodeSpirit.VmChain = VmChain;
   window.CodeSpirit.registerValidator = registerValidator;
   window.CodeSpirit.validators = _customValidators;
+  window.CodeSpirit.validate = function (root, rules, command) {
+    var target = root;
+    if (typeof root === 'string') {
+      target = document.querySelector(root);
+    }
+    if (!target) {
+      target = document.querySelector('form[data-cs-vm]') || document.querySelector('[data-cs-vm]');
+    }
+    if (!target) {
+      return true;
+    }
+    var form = target.matches && target.matches('[data-cs-vm]')
+      ? target
+      : (target.querySelector ? target.querySelector('[data-cs-vm]') : null);
+    if (!form) {
+      return true;
+    }
+    return vm(form).validate(rules, command);
+  };
   if (!window.$cs) {
     window.$cs = window.CodeSpirit;
   }

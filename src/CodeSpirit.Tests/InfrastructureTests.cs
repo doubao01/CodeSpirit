@@ -543,6 +543,75 @@ public class PageRendererTagTests
     }
 
     [Fact]
+    public void Field_Required_RendersAriaAndRuleAttributes()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Field Name='Email' Label='Email' Required='true' />",
+            new Dictionary<string, object?> { ["Email"] = string.Empty });
+
+        Assert.Contains("aria-required=\"true\"", html);
+        Assert.Contains("data-cs-rule=\"required\"", html);
+        Assert.DoesNotContain("Required=\"true\"", html);
+        Assert.DoesNotContain(" required ", html);
+    }
+
+    [Fact]
+    public void Field_RangeRules_RenderDeclarativeTokens()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Field Name='Copies' MinLength='2' MaxLength='6' Min='1' Max='99' Required='true' />",
+            new Dictionary<string, object?>());
+
+        Assert.Contains("data-cs-rule=\"required minLength:2 maxLength:6 min:1 max:99\"", html);
+    }
+
+    [Fact]
+    public void Field_TypeInfersValidatorRule()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Field Name='Email' Type='email' /><cs:Field Name='Age' Type='number' />",
+            new Dictionary<string, object?>());
+
+        Assert.Contains("data-cs-rule=\"email\"", html);
+        Assert.Contains("data-cs-rule=\"numeric\"", html);
+    }
+
+    [Fact]
+    public void Field_ValidateAndMessage_RenderRuleAndMessage()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Field Name='Phone' Validate='phone,integer' Message='Enter a valid phone' Pattern='^[0-9]+$' />",
+            new Dictionary<string, object?>());
+
+        Assert.Contains("data-cs-rule=\"phone integer\"", html);
+        Assert.Contains("data-cs-message=\"Enter a valid phone\"", html);
+        Assert.Contains("data-cs-pattern=\"^[0-9]+$\"", html);
+    }
+
+    [Fact]
+    public void Field_ValidateWhen_RendersCommandScope()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Field Name='Copies' Min='1' Max='99' ValidateWhen='AddBook, UpdateBook' />",
+            new Dictionary<string, object?>());
+
+        Assert.Contains("data-cs-validate-when=\"AddBook, UpdateBook\"", html);
+        Assert.DoesNotContain("ValidateWhen=", html);
+    }
+
+    [Fact]
+    public void Field_WithoutValidation_OmitsRuleAttributes()
+    {
+        var html = PageRenderer.RenderTemplateForTests(
+            "<cs:Field Name='Query' Label='Search' />",
+            new Dictionary<string, object?>());
+
+        Assert.DoesNotContain("data-cs-rule", html);
+        Assert.DoesNotContain("aria-required", html);
+        Assert.DoesNotContain("data-cs-message", html);
+    }
+
+    [Fact]
     public void Scripts_RendersDefaultBuiltInAssets()
     {
         var html = PageRenderer.RenderTemplateForTests(

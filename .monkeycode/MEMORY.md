@@ -36,10 +36,17 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
 - Context: Agent 在执行测试覆盖扩展和性能优化时发现
 - Category: 构建方法、测试方法
 - Instructions:
+  - 环境未预装 .NET SDK；可用 `dotnet-install.sh --channel 10.0 --install-dir /usr/share/dotnet` 安装，并依赖 `libicu-dev`（Debian 需先 `apt-get update`）。
+  - 首次全解决方案构建会因 `local` 源缺少包失败，需先构建可打包项目生成 `src/packages`：依次 build `CodeSpirit.Core`、`CodeSpirit.SourceGenerator`、`CodeSpirit.Infrastructure`，再 build `src/CodeSpirit.slnx`。
   - 使用 `dotnet build src/CodeSpirit.slnx` 验证构建状态。
-  - 使用 `dotnet test src/CodeSpirit.slnx` 运行 C# 测试。
-  - 使用 `node src/CodeSpirit.LibraryManagement/scripts/validate-js-boundary.js` 验证 JS 运行时边界。
+  - 使用 `dotnet test src/CodeSpirit.slnx` 运行 C# 测试（当前 162 项）。
+  - `dotnet run --project src/CodeSpirit.LibraryManagement --urls http://0.0.0.0:8000` 启动示例应用；页面文件从 `bin/Debug/net10.0/Pages` 读取，改 ASPX 后需重新 build 才能生效。
+  - 使用 `node src/CodeSpirit.LibraryManagement/scripts/validate-js-boundary.js` 验证 JS 运行时边界（当前 73 项）。
   - 构建可能出现 `IsPackable` 被禁用的 NuGet 打包 warning，不影响 Debug 构建。
+  - 修改 `CodeSpirit.Infrastructure` 后必须重新生成 `src/packages` 包并强制 `dotnet restore --force --no-cache`；NuGet 全局缓存按版本号命中，同版本号会继续复用旧 DLL，必要时先把 `~/.nuget/packages/codespirit.*` 移到备份目录。
+  - Release 配置在 Linux 上可完整构建（AOT 项目仅编译）；VSIX 容器只能在 Windows 上生成，Linux 构建只验证编译。
+  - GitHub Actions：`ci.yml` 跑 Linux 构建+测试+JS 校验、Windows VSIX、NuGet 打包；`release.yml` 由 `v*` tag 或手动版本触发，产出 4 个 NuGet 包 + VSIX 并创建 GitHub Release。
+  - VSIX 模板的 `CodeSpiritVersion` 属性控制包版本，release 工作流会在 Windows 上先改写它再构建 VSIX。
 
 [PageRenderer 组件属性输出约定]
 - Date: 2026-06-26

@@ -877,6 +877,82 @@ progress:not([class])::-moz-progress-bar {
   font-size: 0.875rem;
 }
 
+.cs-btn-loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+
+.cs-btn-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1rem;
+  height: 1rem;
+  margin: -0.5rem 0 0 -0.5rem;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: cs-spin 0.7s linear infinite;
+}
+
+.cs-loading {
+  cursor: progress;
+}
+
+.cs-loading .cs-btn:not(.cs-btn-loading),
+.cs-loading input,
+.cs-loading select,
+.cs-loading textarea {
+  opacity: 0.65;
+}
+
+@keyframes cs-spin {
+  to { transform: rotate(360deg); }
+}
+
+input.cs-invalid,
+select.cs-invalid,
+textarea.cs-invalid,
+.cs-invalid[data-cs-bind] {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.04);
+}
+
+input.cs-invalid:focus,
+select.cs-invalid:focus,
+textarea.cs-invalid:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.18);
+}
+
+.cs-has-error {
+  color: #b91c1c;
+}
+
+.cs-error {
+  display: block;
+  margin-top: 0.35rem;
+  color: #b91c1c;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.cs-error-summary {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  border-radius: 14px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+  font-size: 0.875rem;
+}
+
+.cs-error-summary-item + .cs-error-summary-item {
+  margin-top: 0.35rem;
+}
+
 .cs-form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

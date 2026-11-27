@@ -45,7 +45,7 @@ CodeSpirit.LibraryManagement/
 | `cs:Link` | 安全渲染链接 |
 | `cs:Form` | 渲染 MVVM 表单 |
 | `cs:Button` | 渲染命令按钮 |
-| `cs:Field` | 渲染绑定字段 |
+| `cs:Field` | 渲染绑定字段，支持 `Required`/`MinLength`/`MaxLength`/`Min`/`Max`/`Pattern`/`Validate`/`Message`/`ValidateWhen` 声明式校验 |
 | `cs:Table` | 渲染表格 |
 | `cs:Column` | 自定义表格单元格模板 |
 | `cs:Toolbar` | 渲染工具栏 |

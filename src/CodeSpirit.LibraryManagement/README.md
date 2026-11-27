@@ -45,7 +45,7 @@ CodeSpirit.LibraryManagement/
 | `cs:Link` | 安全渲染链接 |
 | `cs:Form` | 渲染 MVVM 表单 |
 | `cs:Button` | 渲染命令按钮 |
-| `cs:Field` | 渲染绑定字段 |
+| `cs:Field` | 渲染绑定字段，支持 `Required`/`MinLength`/`MaxLength`/`Min`/`Max`/`Pattern`/`Validate`/`Message`/`ValidateWhen` 声明式校验 |
 | `cs:Table` | 渲染表格 |
 | `cs:Column` | 自定义表格单元格模板 |
 | `cs:Toolbar` | 渲染工具栏 |
@@ -78,6 +78,7 @@ CodeSpirit.LibraryManagement/
 | `CodeSpirit.vm(root)` | 获取链式 ViewModel 操作对象 |
 | `CodeSpirit.input(element)` | 通知 MVVM 某个控件值已变化 |
 | `CodeSpirit.applyState(root, state)` | 将服务端 state 应用到绑定元素 |
+| `CodeSpirit.validate(root?, rules?)` | 触发声明式或显式字段校验并回显错误 |
 | `CodeSpirit.applyRegions(root, regions)` | 替换 `data-cs-region` 局部区域 |
 | `CodeSpirit.mount(root)` | 初次初始化 DOM root |
 | `CodeSpirit.refresh(root)` | 动态更新后重新初始化 DOM root |

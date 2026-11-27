@@ -92,12 +92,28 @@ CodeSpirit 是一个面向 .NET 10 的约定式应用框架，提供 Spring Boot
 - WHEN 按钮声明 `data-cs-confirm="消息"`，THE 系统 SHALL 内置确认对话框，无需 jQuery 行为扩展。
 - WHEN 下拉框声明 `data-cs-source="Command"`，THE 系统 SHALL 自动通过命令获取选项数据。
 
+### R11 声明式字段校验 (P1)
+
+- WHEN `<cs:Field>` 声明 `Required="true"`，THE 系统 SHALL 输出 `aria-required="true"` 和 `data-cs-rule="required"`，由前端运行时在提交前拦截空值。
+- WHEN `<cs:Field>` 声明 `MinLength`、`MaxLength`、`Min`、`Max` 或 `Pattern`，THE 系统 SHALL 输出对应 `data-cs-*` 校验属性，且不泄漏原始 PascalCase 属性名到 HTML。
+- WHEN `<cs:Field>` 声明 `Validate="email,url,numeric,integer,phone,tel"`，THE 系统 SHALL 将每个 token 合并进 `data-cs-rule`，复用运行时内置校验器。
+- WHEN `<cs:Field Type="email|url|tel|number">`，THE 系统 SHALL 自动补对应校验规则，无需重复声明 `Validate`。
+- WHEN `<cs:Field>` 声明 `Message` 或 `Error`，THE 系统 SHALL 输出 `data-cs-message` 作为该字段自定义错误文案。
+- WHEN `data-cs-vm` 表单包含带 `data-cs-rule` 的字段，THE 前端运行时 SHALL 在提交前自动校验，校验失败时阻止提交并回显错误。
+- WHEN `<cs:Field>` 声明 `ValidateWhen="CmdA, CmdB"`，THE 系统 SHALL 输出 `data-cs-validate-when`，运行时仅在提交命令匹配时校验该字段；以 `!` 前缀可排除指定命令。
+- WHEN 表单内有多个 `data-cs-command` 按钮且未指定 submitter，THE 前端运行时 SHALL 使用唯一命令按钮作为当前命令，多个按钮时不推断。
+- WHEN 表单声明 `data-cs-validate="false"`，THE 前端运行时 SHALL 跳过自动校验。
+- THE 前端运行时 SHALL 暴露 `CodeSpirit.validate(root, rules?)`，允许页面按需显式触发声明式或规则对象校验。
+- WHEN 校验失败，THE 前端运行时 SHALL 为字段添加 `cs-invalid` 和 `aria-invalid="true"`，并在 `label` 内渲染 `role="alert"` 的错误提示。
+- WHEN 用户修改已校验失败的字段，THE 前端运行时 SHALL 清除该字段的错误态，避免错误提示滞留。
+
 ## 设计边界
 
 | 边界 | 归属 | 约束 |
 |------|------|------|
 | `data-cs-*` | MVVM runtime | 只处理绑定、命令、状态、局部刷新、错误回显和表达式求值 |
 | `data-cs-show/enable/refresh/confirm/source` | Expression engine | 内置微型表达式引擎，无额外依赖 |
+| `data-cs-rule` / `data-cs-message` | Declarative validation | 字段级校验规则与文案，由运行时在提交前消费 |
 | `data-ui` | UI behavior layer | 只处理渐进增强、组件行为和第三方控件初始化 |
 | `data-cs-intent` | Intent analyzer | 只处理元素级语义色调 |
 | `data-cs-scene` | Scene analyzer | 只处理页面级场景视觉 |
@@ -132,8 +148,11 @@ CodeSpirit 是一个面向 .NET 10 的约定式应用框架，提供 Spring Boot
 - ✓ `<cs:Wizard>` 多步向导组件和内置步骤切换已可用（P1）。
 - ✓ `<cs:Tabs>` 与 `<cs:Wizard>` 支持完整 ARIA 语义和左右方向键键盘导航（P1）。
 - ✓ `data-cs-source` 选项数据源协议已可用（P1）。
-- ✓ 渲染缓存、路径缓存和指标机制已实现，156 个 C# 测试 + JS 边界验证全通过。
-- ✓ JS 测试套件已扩展至 61 个前端测试用例，覆盖表达式、VM 链、意图分析、主题 token、运行时快捷 API 及拓展校验。
+- ✓ 渲染缓存、路径缓存和指标机制已实现，C# 测试 + JS 边界验证全通过。
+- ✓ JS 测试套件覆盖表达式、VM 链、意图分析、主题 token、运行时快捷 API 及拓展校验。
+- ✓ R11 声明式字段校验已落地：`<cs:Field>` 输出 `aria-required`/`data-cs-rule`/`data-cs-pattern`/`data-cs-message`，运行时在提交前自动校验并回显，输入时清除错误，`CodeSpirit.validate(root, rules?, command?)` 可显式触发，`ValidateWhen` 支持按命令限定规则；C# 6 项 + JS 12 项测试覆盖。
+- ✓ `cs:Field` 声明式校验已可用：`Required`、`MinLength`、`MaxLength`、`Min`、`Max`、`Pattern`、`Validate`、`Message` 输出为 `data-cs-*` 规则，表单提交前自动校验并回显错误。
+- ✓ 校验错误样式 `.cs-invalid`、`.cs-error`、`.cs-error-summary` 和加载态 `.cs-btn-loading` 已内置。
 
 ## 验证标准
 

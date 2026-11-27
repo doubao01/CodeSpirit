@@ -735,6 +735,240 @@ function run() {
     document.body.removeChild(div);
   });
 
+  test('declarative validation blocks empty required field', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var input = document.createElement('input');
+    input.setAttribute('name', 'BookTitle');
+    input.setAttribute('data-cs-rule', 'required');
+    input.value = '';
+    var label = document.createElement('label');
+    label.appendChild(input);
+    form.appendChild(label);
+    document.body.appendChild(form);
+
+    assert.equal(CodeSpirit.validate(form), false, 'validate should fail');
+    assert.ok(input.classList.contains('cs-invalid'), 'input invalid class');
+    assert.equal(input.getAttribute('aria-invalid'), 'true', 'aria-invalid');
+    assert.ok(label.querySelector('.cs-error'), 'label error span');
+    document.body.removeChild(form);
+  });
+
+  test('declarative validation passes valid required field', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var input = document.createElement('input');
+    input.setAttribute('name', 'BookTitle');
+    input.setAttribute('data-cs-rule', 'required');
+    input.value = 'Domain Design';
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    assert.equal(CodeSpirit.validate(form), true);
+    assert.ok(!input.classList.contains('cs-invalid'));
+    document.body.removeChild(form);
+  });
+
+  test('declarative validation enforces length and range tokens', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var input = document.createElement('input');
+    input.setAttribute('name', 'Copies');
+    input.setAttribute('data-cs-rule', 'required minLength:2 maxLength:4 min:10 max:99');
+    input.value = '5';
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    assert.equal(CodeSpirit.validate(form), false);
+    input.value = '55';
+    assert.equal(CodeSpirit.validate(form), true);
+    document.body.removeChild(form);
+  });
+
+  test('declarative validation merges custom message and pattern', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var input = document.createElement('input');
+    input.setAttribute('name', 'Code');
+    input.setAttribute('data-cs-rule', 'required');
+    input.setAttribute('data-cs-pattern', '^[A-Z]{3}$');
+    input.setAttribute('data-cs-message', 'Use three capital letters');
+    input.value = 'abc';
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    assert.equal(CodeSpirit.validate(form), false);
+    var error = form.querySelector('.cs-error');
+    assert.equal(error.textContent, 'Use three capital letters');
+    document.body.removeChild(form);
+  });
+
+  test('explicit rules override declarative rules for the same field', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var input = document.createElement('input');
+    input.setAttribute('name', 'Score');
+    input.setAttribute('data-cs-rule', 'required');
+    input.value = '';
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    assert.equal(CodeSpirit.validate(form, { Score: { numeric: true } }), true);
+    document.body.removeChild(form);
+  });
+
+  test('validating another field keeps declarative field error', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var required = document.createElement('input');
+    required.setAttribute('name', 'Title');
+    required.setAttribute('data-cs-rule', 'required');
+    required.value = '';
+    var other = document.createElement('input');
+    other.setAttribute('name', 'Note');
+    other.value = '';
+    form.appendChild(required);
+    form.appendChild(other);
+    document.body.appendChild(form);
+
+    assert.equal(CodeSpirit.validate(form), false);
+    assert.ok(required.classList.contains('cs-invalid'));
+    document.body.removeChild(form);
+  });
+
+  test('CodeSpirit.validate evaluates an isolated form', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var input = document.createElement('input');
+    input.setAttribute('name', 'Ready');
+    input.setAttribute('data-cs-rule', 'required');
+    input.value = 'ok';
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    assert.equal(typeof CodeSpirit.validate, 'function');
+    assert.equal(CodeSpirit.validate(form), true);
+    document.body.removeChild(form);
+  });
+
+  test('CodeSpirit.validate with no root targets the first ViewModel form', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var input = document.createElement('input');
+    input.setAttribute('name', 'Mandatory');
+    input.setAttribute('data-cs-rule', 'required');
+    input.value = '';
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    assert.equal(CodeSpirit.validate(), false, 'default root should validate the form');
+    assert.ok(input.classList.contains('cs-invalid'));
+    document.body.removeChild(form);
+  });
+
+  test('typing in an invalid field clears its error', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var input = document.createElement('input');
+    input.setAttribute('name', 'Title');
+    input.setAttribute('data-cs-rule', 'required');
+    input.value = '';
+    var label = document.createElement('label');
+    label.appendChild(input);
+    form.appendChild(label);
+    document.body.appendChild(form);
+
+    assert.equal(CodeSpirit.validate(form), false);
+    assert.ok(label.querySelector('.cs-error'), 'error shown before typing');
+
+    input.value = 'Refactoring';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    assert.ok(!label.querySelector('.cs-error'), 'error cleared after typing');
+    assert.ok(!input.classList.contains('cs-invalid'));
+    document.body.removeChild(form);
+  });
+
+  test('validate-when skips fields not matching the active command', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+
+    var copies = document.createElement('input');
+    copies.setAttribute('name', 'Copies');
+    copies.setAttribute('data-cs-rule', 'required min:1 max:999');
+    copies.setAttribute('data-cs-validate-when', 'AddBook UpdateBook');
+    copies.value = '';
+
+    var bookId = document.createElement('input');
+    bookId.setAttribute('name', 'BookId');
+    bookId.setAttribute('data-cs-rule', 'required');
+    bookId.setAttribute('data-cs-validate-when', 'UpdateBook ArchiveBook');
+    bookId.value = '';
+
+    form.appendChild(copies);
+    form.appendChild(bookId);
+    document.body.appendChild(form);
+
+    var vm = CodeSpirit.vm(form);
+    assert.equal(vm.validate(null, 'AddBook'), false, 'AddBook validates copies');
+    assert.ok(copies.classList.contains('cs-invalid'));
+    assert.ok(!bookId.classList.contains('cs-invalid'), 'BookId not validated for AddBook');
+
+    assert.equal(vm.validate(null, 'ArchiveBook'), false, 'ArchiveBook validates BookId');
+    assert.ok(bookId.classList.contains('cs-invalid'));
+
+    assert.equal(vm.validate(null, 'Search'), true, 'unlisted command skips both fields');
+    document.body.removeChild(form);
+  });
+
+  test('validate-when exclusion token blocks a command', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var amount = document.createElement('input');
+    amount.setAttribute('name', 'FineAmount');
+    amount.setAttribute('data-cs-rule', 'required');
+    amount.setAttribute('data-cs-validate-when', '!CollectFine');
+    amount.value = '';
+    form.appendChild(amount);
+    document.body.appendChild(form);
+
+    var vm = CodeSpirit.vm(form);
+    assert.equal(vm.validate(null, 'CollectFine'), true, 'excluded command skips field');
+    assert.equal(vm.validate(null, 'BorrowBook'), false, 'other commands validate field');
+    document.body.removeChild(form);
+  });
+
+  test('submit gate honors validate-when via the submitter command', function () {
+    var form = document.createElement('form');
+    form.setAttribute('data-cs-vm', '');
+    var copies = document.createElement('input');
+    copies.setAttribute('name', 'Copies');
+    copies.setAttribute('data-cs-rule', 'required');
+    copies.setAttribute('data-cs-validate-when', 'AddBook');
+    copies.value = '';
+    var addButton = document.createElement('button');
+    addButton.setAttribute('type', 'submit');
+    addButton.setAttribute('data-cs-command', 'AddBook');
+    var archiveButton = document.createElement('button');
+    archiveButton.setAttribute('type', 'submit');
+    archiveButton.setAttribute('data-cs-command', 'ArchiveBook');
+    form.appendChild(copies);
+    form.appendChild(addButton);
+    form.appendChild(archiveButton);
+    document.body.appendChild(form);
+
+    var event = new Event('submit', { bubbles: true, cancelable: true });
+    event.submitter = archiveButton;
+    form.dispatchEvent(event);
+    assert.ok(!copies.classList.contains('cs-invalid'), 'ArchiveBook skips Copies rule');
+
+    var addEvent = new Event('submit', { bubbles: true, cancelable: true });
+    addEvent.submitter = addButton;
+    form.dispatchEvent(addEvent);
+    assert.ok(copies.classList.contains('cs-invalid'), 'AddBook enforces Copies rule');
+    document.body.removeChild(form);
+  });
+
   console.log('PASSED: ' + passed + '/' + (passed + failed) + ' tests');
 
   if (failed > 0) {

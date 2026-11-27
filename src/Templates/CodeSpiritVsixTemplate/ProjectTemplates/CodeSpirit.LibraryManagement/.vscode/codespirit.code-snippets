@@ -482,6 +482,14 @@
     ],
     "description": "cs:Form 表单容器 + cs:Field 字段 + cs:Button 按钮"
   },
+  "cs:Field 带校验字段": {
+    "prefix": "csfieldval",
+    "scope": "html",
+    "body": [
+      "<cs:Field Name=\"${1:Email}\" Label=\"${2:邮箱}\" Type=\"${3:email}\" Required=\"true\" ValidateWhen=\"${4:Submit}\"${5} />$0"
+    ],
+    "description": "cs:Field 声明式校验（Required/Type/Min/Max/MinLength/MaxLength/Pattern/Message）"
+  },
   "cs:Table 内联列名": {
     "prefix": "cstable",
     "scope": "html",
@@ -641,6 +649,24 @@
     "scope": "html",
     "body": ["data-cs-scene=\"${1|dashboard,library,admin,commerce,content,analytics,crm,finance,education,healthcare,logistics,developer,hr,manufacturing,hospitality,real-estate,legal,support|}\"$0"],
     "description": "强制指定页面场景风格"
+  },
+  "data-cs-rule 校验规则": {
+    "prefix": "cs-attr-rule",
+    "scope": "html",
+    "body": ["data-cs-rule=\"${1|required,required minLength:2,maxLength:6,min:1 max:99,email,numeric|}\"$0"],
+    "description": "声明式字段校验规则，提交前由运行时自动校验"
+  },
+  "data-cs-validate-when 命令级校验": {
+    "prefix": "cs-attr-when",
+    "scope": "html",
+    "body": ["data-cs-validate-when=\"${1:AddBook, UpdateBook}\"$0"],
+    "description": "仅在指定命令提交时校验该字段，支持 !Command 排除"
+  },
+  "data-cs-validate 开关": {
+    "prefix": "cs-attr-validate",
+    "scope": "html",
+    "body": ["data-cs-validate=\"${1|false,true|}\"$0"],
+    "description": "关闭或开启表单提交前的自动校验"
   },
   "data-cs-visible 条件显示": {
     "prefix": "cs-attr-vis",

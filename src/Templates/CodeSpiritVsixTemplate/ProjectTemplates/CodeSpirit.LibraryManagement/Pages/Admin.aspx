@@ -44,14 +44,14 @@
       <cs:Form class="admin-card">
         <h2>Book Catalog</h2>
         <p>Add a book, or provide Book Id to update/archive/restore existing records.</p>
-        <cs:Field Name="BookId" Label="Book Id" />
-        <cs:Field Name="BookIsbn" Label="ISBN" />
-        <cs:Field Name="BookTitle" Label="Title" />
+        <cs:Field Name="BookId" Label="Book Id" Required="true" ValidateWhen="UpdateBook, ArchiveBook, RestoreBook" />
+        <cs:Field Name="BookIsbn" Label="ISBN" MaxLength="20" ValidateWhen="AddBook, UpdateBook" />
+        <cs:Field Name="BookTitle" Label="Title" Required="true" MaxLength="120" ValidateWhen="AddBook, UpdateBook" />
         <cs:Field Name="BookAuthor" Label="Author" />
         <cs:Field Name="BookCategory" Label="Category" />
         <cs:Field Name="BookLocation" Label="Location" />
-        <cs:Field Name="BookPublishedYear" Label="Year" />
-        <cs:Field Name="BookCopyCount" Label="Copies" />
+        <cs:Field Name="BookPublishedYear" Label="Year" Type="number" />
+        <cs:Field Name="BookCopyCount" Label="Copies" Type="number" Min="1" Max="999" ValidateWhen="AddBook" />
         <div class="button-row wrap">
           <cs:Button Command="AddBook">Add</cs:Button>
           <cs:Button Command="UpdateBook">Update</cs:Button>
@@ -64,9 +64,9 @@
         <h2>Readers</h2>
         <p>Register readers, update profiles, and control active/suspended status.</p>
         <cs:Field Name="ReaderId" Label="Reader Id" />
-        <cs:Field Name="ReaderName" Label="Name" />
-        <cs:Field Name="ReaderEmail" Label="Email" />
-        <cs:Field Name="ReaderPhone" Label="Phone" />
+        <cs:Field Name="ReaderName" Label="Name" Required="true" MaxLength="40" ValidateWhen="RegisterReader, UpdateReader" />
+        <cs:Field Name="ReaderEmail" Label="Email" Type="email" ValidateWhen="RegisterReader, UpdateReader" />
+        <cs:Field Name="ReaderPhone" Label="Phone" Type="tel" ValidateWhen="RegisterReader, UpdateReader" />
         <cs:Field Name="ReaderLevel" Label="Level" Placeholder="Standard, Premium, Student" />
         <div class="button-row wrap">
           <cs:Button Command="RegisterReader">Register</cs:Button>
@@ -96,7 +96,7 @@
         <cs:Field Name="ReservationReaderId" Label="Reader Id" />
         <cs:Field Name="ReservationId" Label="Reservation Id" />
         <cs:Field Name="ReaderId" Label="Fine Reader Id" />
-        <cs:Field Name="FineAmount" Label="Fine Amount" />
+        <cs:Field Name="FineAmount" Label="Fine Amount" Type="number" Required="true" Min="0" Max="10000" ValidateWhen="CollectFine" />
         <div class="button-row wrap">
           <cs:Button Command="ReserveBook">Reserve</cs:Button>
           <cs:Button Command="CancelReservation">Cancel Reservation</cs:Button>
@@ -118,7 +118,7 @@
         <h2>Inventory Control</h2>
         <p>Receive new copies, write off damaged copies, and relocate collection items with audit history.</p>
         <cs:Field Name="InventoryBookId" Label="Book Id" />
-        <cs:Field Name="InventoryQuantity" Label="Quantity" />
+        <cs:Field Name="InventoryQuantity" Label="Quantity" Type="number" />
         <cs:Field Name="InventoryLocation" Label="New Location" Placeholder="A-01, B-12, Archive" />
         <cs:Field Name="InventoryReason" Label="Reason" Placeholder="Purchase order, damaged copy, shelf optimization" />
         <div class="button-row wrap">

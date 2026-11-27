@@ -78,6 +78,8 @@ interface CodespiritFieldRules {
   custom?: (value: unknown, field: string) => boolean | string;
   /** Custom error message overriding defaults */
   message?: string;
+  /** Only validate when the submitted command matches (supports `!Command` exclusions) */
+  validateWhen?: string | string[];
   /** Arbitrary custom validator rules */
   [customRule: string]: unknown;
 }
@@ -214,7 +216,7 @@ interface VmChain {
    *   Age: { min: 18, max: 65 }
    * });
    */
-  validate(rules: Record<string, CodespiritFieldRules>): boolean;
+  validate(rules?: Record<string, CodespiritFieldRules> | null, command?: string | null): boolean;
 
   /**
    * Observe changes to one or more fields. The callback fires whenever
@@ -468,6 +470,26 @@ interface CodeSpiritNamespace {
    * @param regions - Object of { regionName: htmlString } pairs
    */
   applyRegions(root: HTMLElement, regions: Record<string, string>): void;
+
+  /**
+   * Validate fields and render error messages. Combines declarative rules
+   * (`data-cs-rule`, `data-cs-pattern`, `data-cs-message`) with optional
+   * programmatic rules. With no arguments, validates every field inside
+   * `document` that declares `data-cs-rule`.
+   *
+   * Fields render a `cs-error` span and receive `cs-invalid` / `aria-invalid`
+   * when invalid; typing in a field clears its error automatically.
+   *
+   * @param root - A root element, CSS selector, or omitted to target the first ViewModel form
+   * @param rules - Optional field rules merged on top of declarative rules
+   * @param command - Optional command name used by `data-cs-validate-when` filtering
+   * @returns true when every field passes
+   *
+   * @example
+   * CodeSpirit.validate();
+   * CodeSpirit.validate('#checkout', { Email: { required: true, email: true } });
+   */
+  validate(root?: HTMLElement | string | null, rules?: Record<string, CodespiritFieldRules> | null, command?: string | null): boolean;
 
   /**
    * Display validation errors on form fields and show an error summary.
