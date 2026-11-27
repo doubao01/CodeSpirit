@@ -4,7 +4,7 @@
   max-width: 640px;
   margin: 0 auto;
   text-align: center;
-  padding: 3rem 1rem;
+  padding: var(--cs-space-7) var(--cs-space-4);
 }
 
 .about-page .version {

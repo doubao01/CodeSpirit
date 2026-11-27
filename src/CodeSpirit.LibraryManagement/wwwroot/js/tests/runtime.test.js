@@ -599,6 +599,29 @@ function run() {
     }
   });
 
+  test('Theme tokens include surface and status scales', function () {
+    if (typeof CodeSpirit.theme !== 'undefined') {
+      var tokens = CodeSpirit.theme.tokens();
+      ['--cs-surface-hover', '--cs-field-bg', '--cs-table-head-bg', '--cs-shadow-sm',
+        '--cs-tone-green-soft', '--cs-tone-green-text', '--cs-tone-purple-text',
+        '--cs-spotlight-bg', '--cs-radius-full'].forEach(function (name) {
+        assert.ok(tokens[name] !== undefined && tokens[name] !== '', 'Missing token ' + name);
+      });
+    }
+  });
+
+  test('Theme tokens fall back per scene when styles are unavailable', function () {
+    if (typeof CodeSpirit.theme !== 'undefined') {
+      var dashboard = CodeSpirit.theme.tokens('dashboard');
+      var library = CodeSpirit.theme.tokens('library');
+      assert.equal(dashboard['--cs-bg'], '#061222');
+      assert.equal(library['--cs-bg'], '#f6f1e8');
+      assert.ok(dashboard['--cs-primary'] !== library['--cs-primary']);
+      var unknown = CodeSpirit.theme.tokens('does-not-exist');
+      assert.equal(unknown['--cs-primary'], '#6d5dfc');
+    }
+  });
+
   test('input sets form field value', function () {
     var form = document.createElement('form');
     form.setAttribute('data-cs-vm', '');

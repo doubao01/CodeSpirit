@@ -9,7 +9,7 @@
 .search-card,
 .admin-metric {
   border: 1px solid var(--cs-border);
-  border-radius: 18px;
+  border-radius: var(--cs-radius);
   background: var(--cs-surface);
   box-shadow: var(--cs-shadow);
 }
@@ -18,9 +18,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
-  padding: 2rem;
-  background: linear-gradient(135deg, #eff6ff, #ffffff 58%, #f5f3ff);
+  gap: var(--cs-space-5);
+  padding: var(--cs-space-6);
+  background:
+    radial-gradient(circle at 12% 20%, color-mix(in srgb, var(--cs-primary) 14%, transparent), transparent 60%),
+    linear-gradient(135deg, var(--cs-surface-strong), var(--cs-surface));
 }
 
 .admin-hero h1 {
@@ -44,13 +46,22 @@
   display: inline-flex;
   justify-content: center;
   border: 0;
-  border-radius: 999px;
-  background: var(--cs-primary);
-  color: white;
+  border-radius: var(--cs-radius-full);
+  background: linear-gradient(135deg, var(--cs-primary), var(--cs-accent));
+  color: var(--cs-text-on-primary);
   cursor: pointer;
   font-weight: 800;
   padding: 0.75rem 1rem;
   text-decoration: none;
+  transition: transform var(--cs-duration) var(--cs-ease),
+    box-shadow var(--cs-duration) var(--cs-ease),
+    filter var(--cs-duration) var(--cs-ease);
+}
+
+.screen-link:hover,
+.search-card button:hover,
+.admin-card button:hover {
+  filter: brightness(0.98) saturate(1.08);
 }
 
 .admin-metrics {
@@ -116,9 +127,20 @@
 .search-card input {
   width: 100%;
   border: 1px solid var(--cs-border);
-  border-radius: 12px;
+  border-radius: var(--cs-radius-sm);
+  background: var(--cs-field-bg);
+  color: var(--cs-text);
   font: inherit;
   padding: 0.7rem 0.85rem;
+}
+
+.admin-card input:focus,
+.admin-card textarea:focus,
+.search-card input:focus {
+  outline: none;
+  border-color: var(--cs-primary);
+  box-shadow: var(--cs-ring);
+  background: var(--cs-surface-strong);
 }
 
 .admin-card textarea {
@@ -145,16 +167,16 @@
 }
 
 .notice {
-  border-radius: 14px;
+  border-radius: var(--cs-radius-md);
   font-weight: 800;
   padding: 0.85rem 1rem;
 }
 
-.notice-green { background: #dcfce7; color: #166534; }
-.notice-blue { background: #dbeafe; color: #1d4ed8; }
-.notice-amber { background: #fef3c7; color: #92400e; }
-.notice-red { background: #fee2e2; color: #991b1b; }
-.notice-purple { background: #f3e8ff; color: #6b21a8; }
+.notice-green { background: var(--cs-tone-green-soft); color: var(--cs-tone-green-text); }
+.notice-blue { background: var(--cs-tone-blue-soft); color: var(--cs-tone-blue-text); }
+.notice-amber { background: var(--cs-tone-amber-soft); color: var(--cs-tone-amber-text); }
+.notice-red { background: var(--cs-tone-red-soft); color: var(--cs-tone-red-text); }
+.notice-purple { background: var(--cs-tone-purple-soft); color: var(--cs-tone-purple-text); }
 
 .activity {
   display: flex;
@@ -191,35 +213,35 @@
 
 .status {
   display: inline-flex;
-  border-radius: 999px;
+  border-radius: var(--cs-radius-full);
   padding: 0.25rem 0.55rem;
   font-size: 0.76rem;
   font-weight: 800;
 }
 
 .status-Available {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--cs-tone-green-soft);
+  color: var(--cs-tone-green-text);
 }
 
 .status-Borrowed {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--cs-tone-amber-soft);
+  color: var(--cs-tone-amber-text);
 }
 
 .status-Reserved {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--cs-tone-blue-soft);
+  color: var(--cs-tone-blue-text);
 }
 
 .status-Overdue {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--cs-tone-red-soft);
+  color: var(--cs-tone-red-text);
 }
 
 .status-Archived {
-  background: #f3e8ff;
-  color: #6b21a8;
+  background: var(--cs-tone-purple-soft);
+  color: var(--cs-tone-purple-text);
 }
 
 .split-tables {
@@ -229,23 +251,12 @@
 }
 
 table {
-  width: 100%;
-  border-collapse: collapse;
   min-width: 760px;
 }
 
 th,
 td {
-  border-bottom: 1px solid var(--cs-border);
-  padding: 0.7rem;
-  text-align: left;
   vertical-align: top;
-}
-
-th {
-  color: var(--cs-text-muted);
-  font-size: 0.78rem;
-  text-transform: uppercase;
 }
 
 @media (max-width: 960px) {

@@ -93,7 +93,20 @@ CodeSpirit.LibraryManagement/
 
 `wwwroot/css/site.css` 是内置默认视觉系统。普通 HTML 和 CodeSpirit 标签无需页面 CSS 即具备现代化外观。
 
-内置场景：`dashboard`、`library`、`admin`、`commerce`、`content`、`analytics`、`crm`、`finance`、`education`、`healthcare`、`logistics`、`developer`、`hr`、`manufacturing`、`hospitality`、`real-estate`、`legal`、`support`、`supply-chain`、`research`、`security`、`retail`、`insurance`、`ngo`。
+设计 token 分为六组，所有内置样式和页面样式都只引用这些变量：
+
+| 组 | Token |
+|----|-------|
+| 品牌 | `--cs-primary`、`--cs-primary-dark`、`--cs-primary-soft`、`--cs-accent`、`--cs-accent-2` |
+| 表面 | `--cs-bg`、`--cs-body-bg`、`--cs-surface`、`--cs-surface-strong`、`--cs-surface-muted`、`--cs-surface-hover`、`--cs-field-bg`、`--cs-overlay`、`--cs-header-bg`、`--cs-table-head-bg`、`--cs-table-head-text`、`--cs-code-bg`、`--cs-code-text`、`--cs-spotlight-*` |
+| 文本 | `--cs-text`、`--cs-text-muted`、`--cs-text-soft`、`--cs-text-on-primary`、`--cs-placeholder`、`--cs-text-neutral-*` |
+| 语义色 | `--cs-tone-{green,red,amber,blue,purple}` 及各自的 `-soft`、`-text`、`-ring` 变体 |
+| 形状与阴影 | `--cs-radius-{xs,sm,md,full}`、`--cs-shadow-{sm,soft,lg,primary,primary-hover}`、`--cs-shadow-color`、`--cs-ring`、`--cs-ring-danger`、`--cs-glow` |
+| 排版与间距 | `--cs-font`、`--cs-font-mono`、`--cs-text-{xs,sm,base,lg,xl}`、`--cs-space-{1..7}`、`--cs-duration`、`--cs-ease` |
+
+每个 `.cs-scene-*` 只声明品牌色、表面色和明暗主题；圆角、阴影、表头、占位符等其余 token 由 `[class*='cs-scene-']` 的 `@supports (color: color-mix(in srgb, ...))` 规则从主色派生，因此新增场景不会出现发光环、阴影或表头颜色不一致。
+
+内置场景：`dashboard`、`library`、`admin`、`commerce`、`content`、`analytics`、`crm`、`finance`、`education`、`healthcare`、`logistics`、`developer`、`hr`、`manufacturing`、`hospitality`、`real-estate`、`legal`、`support`、`supply-chain`、`research`、`security`、`retail`、`insurance`、`ngo`、`telecom`、`energy`、`transportation`、`agriculture`、`media`、`gaming`、`automotive`、`pharmaceutical`、`construction`、`aviation`、`maritime`、`government`。
 
 显式指定场景：
 
@@ -103,7 +116,9 @@ CodeSpirit.LibraryManagement/
 </main>
 ```
 
-低置信度识别会写入 `data-cs-scene-confidence="low"`、`data-cs-scene-candidate` 和 `data-cs-scene-score`。使用 `CodeSpirit.theme.exportTokens(root)` 可导出当前场景下的 `--cs-*` 主题 token。
+低置信度识别会写入 `data-cs-scene-confidence="low"`、`data-cs-scene-candidate` 和 `data-cs-scene-score`。`CodeSpirit.theme.exportTokens(root)` 导出元素当前计算出的 `--cs-*` 主题 token；传入场景名（如 `CodeSpirit.theme.exportTokens('dashboard')`）可离线预览该场景配色。
+
+`validate-js-boundary.js` 会校验 `site.css` 与模板副本一致、所有被引用的 token 都有定义、导出 token 全部存在于 `site.css` 和 `DEFAULT_THEME_TOKENS`，并要求每个可识别场景同时具备 `.cs-scene-*` 样式与 `SCENE_THEME_VARIANTS` 条目。
 
 ## CSV 导入导出
 

@@ -337,81 +337,314 @@
   ];
 
   var THEME_TOKEN_NAMES = [
-    '--cs-primary', '--cs-primary-dark', '--cs-accent', '--cs-accent-2', '--cs-bg',
-    '--cs-surface', '--cs-surface-strong', '--cs-text', '--cs-text-muted', '--cs-text-soft',
-    '--cs-text-on-primary', '--cs-border', '--cs-border-soft', '--cs-header-bg', '--cs-radius',
-    '--cs-radius-lg', '--cs-shadow', '--cs-shadow-soft', '--cs-ring', '--cs-font',
-    '--cs-tone-green', '--cs-tone-red', '--cs-tone-amber', '--cs-tone-blue', '--cs-tone-purple'
+    '--cs-primary', '--cs-primary-dark', '--cs-primary-soft', '--cs-accent', '--cs-accent-2', '--cs-bg',
+    '--cs-surface', '--cs-surface-strong', '--cs-surface-muted', '--cs-surface-hover', '--cs-field-bg',
+    '--cs-overlay', '--cs-text', '--cs-text-muted', '--cs-text-soft', '--cs-text-on-primary', '--cs-placeholder',
+    '--cs-border', '--cs-border-soft', '--cs-header-bg', '--cs-table-head-bg', '--cs-table-head-text',
+    '--cs-code-bg', '--cs-code-text',
+    '--cs-spotlight-text', '--cs-spotlight-text-muted', '--cs-spotlight-border', '--cs-spotlight-bg', '--cs-spotlight-shadow',
+    '--cs-radius', '--cs-radius-lg', '--cs-radius-md', '--cs-radius-sm',
+    '--cs-radius-full', '--cs-shadow-color', '--cs-glow',
+    '--cs-shadow', '--cs-shadow-soft', '--cs-shadow-sm', '--cs-shadow-lg',
+    '--cs-shadow-primary', '--cs-shadow-primary-hover', '--cs-ring', '--cs-ring-danger', '--cs-font', '--cs-font-mono',
+    '--cs-tone-green', '--cs-tone-green-soft', '--cs-tone-green-text',
+    '--cs-tone-red', '--cs-tone-red-soft', '--cs-tone-red-text',
+    '--cs-tone-amber', '--cs-tone-amber-soft', '--cs-tone-amber-text',
+    '--cs-tone-blue', '--cs-tone-blue-soft', '--cs-tone-blue-text',
+    '--cs-tone-purple', '--cs-tone-purple-soft', '--cs-tone-purple-text'
   ];
 
   var DEFAULT_THEME_TOKENS = {
     '--cs-primary': '#6d5dfc',
     '--cs-primary-dark': '#4f46e5',
+    '--cs-primary-soft': 'rgba(109, 93, 252, 0.10)',
     '--cs-accent': '#00d4ff',
     '--cs-accent-2': '#a7f3d0',
     '--cs-bg': '#f4f7fb',
     '--cs-surface': 'rgba(255, 255, 255, 0.86)',
     '--cs-surface-strong': '#ffffff',
+    '--cs-surface-muted': 'rgba(248, 250, 252, 0.92)',
+    '--cs-surface-hover': 'rgba(15, 23, 42, 0.06)',
+    '--cs-field-bg': 'rgba(255, 255, 255, 0.80)',
+    '--cs-overlay': 'rgba(15, 23, 42, 0.55)',
     '--cs-text': '#111827',
     '--cs-text-muted': '#5b677a',
     '--cs-text-soft': '#93a0b3',
     '--cs-text-on-primary': '#ffffff',
+    '--cs-placeholder': '#93a0b3',
     '--cs-border': 'rgba(119, 134, 159, 0.22)',
     '--cs-border-soft': 'rgba(119, 134, 159, 0.12)',
     '--cs-header-bg': 'rgba(255, 255, 255, 0.72)',
+    '--cs-table-head-bg': 'rgba(255, 255, 255, 0.62)',
+    '--cs-table-head-text': '#5b677a',
+    '--cs-code-bg': '#1e293b',
+    '--cs-code-text': '#e2e8f0',
+    '--cs-spotlight-text': '#e5f0ff',
+    '--cs-spotlight-text-muted': '#a9c3e8',
+    '--cs-spotlight-border': 'rgba(56, 189, 248, 0.22)',
+    '--cs-spotlight-bg': 'radial-gradient(circle at top left, rgba(56, 189, 248, 0.36), transparent 32%), radial-gradient(circle at bottom right, rgba(129, 140, 248, 0.24), transparent 30%), linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.72))',
+    '--cs-spotlight-shadow': '0 24px 80px rgba(0, 0, 0, 0.28)',
     '--cs-radius': '18px',
     '--cs-radius-lg': '28px',
+    '--cs-radius-md': '14px',
+    '--cs-radius-sm': '10px',
+    '--cs-radius-full': '999px',
+    '--cs-shadow-color': 'rgba(17, 24, 39, 0.12)',
+    '--cs-glow': 'none',
     '--cs-shadow': '0 20px 60px rgba(17, 24, 39, 0.10)',
     '--cs-shadow-soft': '0 12px 36px rgba(17, 24, 39, 0.07)',
+    '--cs-shadow-sm': '0 6px 18px rgba(17, 24, 39, 0.06)',
+    '--cs-shadow-lg': '0 24px 80px rgba(15, 23, 42, 0.28)',
+    '--cs-shadow-primary': '0 12px 28px rgba(79, 70, 229, 0.22)',
+    '--cs-shadow-primary-hover': '0 16px 36px rgba(79, 70, 229, 0.28)',
     '--cs-ring': '0 0 0 4px rgba(109, 93, 252, 0.16)',
+    '--cs-ring-danger': '0 0 0 4px rgba(239, 68, 68, 0.18)',
     '--cs-font': "Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif",
+    '--cs-font-mono': "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
     '--cs-tone-green': '#22c55e',
+    '--cs-tone-green-soft': 'rgba(34, 197, 94, 0.12)',
+    '--cs-tone-green-text': '#166534',
     '--cs-tone-red': '#ef4444',
+    '--cs-tone-red-soft': 'rgba(239, 68, 68, 0.12)',
+    '--cs-tone-red-text': '#991b1b',
     '--cs-tone-amber': '#f59e0b',
+    '--cs-tone-amber-soft': 'rgba(245, 158, 11, 0.14)',
+    '--cs-tone-amber-text': '#92400e',
     '--cs-tone-blue': '#3b82f6',
-    '--cs-tone-purple': '#a855f7'
+    '--cs-tone-blue-soft': 'rgba(59, 130, 246, 0.12)',
+    '--cs-tone-blue-text': '#1d4ed8',
+    '--cs-tone-purple': '#a855f7',
+    '--cs-tone-purple-soft': 'rgba(168, 85, 247, 0.12)',
+    '--cs-tone-purple-text': '#6b21a8'
   };
 
+  // Fallback values mirror site.css so exportTokens stays correct even when
+  // computed styles are unavailable (SSR, jsdom, detached nodes).
   var SCENE_THEME_VARIANTS = {
     dashboard: {
+      '--cs-primary': '#22d3ee',
+      '--cs-primary-dark': '#06b6d4',
+      '--cs-accent': '#8b5cf6',
+      '--cs-bg': '#061222',
+      '--cs-text': '#e8f4ff',
+      '--cs-text-muted': '#8db5dc'
+    },
+    library: {
+      '--cs-primary': '#6d5dfc',
+      '--cs-primary-dark': '#4f46e5',
+      '--cs-accent': '#d97706',
+      '--cs-accent-2': '#10b981',
+      '--cs-bg': '#f6f1e8',
+      '--cs-text': '#241a12',
+      '--cs-text-muted': '#736151'
+    },
+    admin: {
+      '--cs-primary': '#2563eb',
+      '--cs-primary-dark': '#1d4ed8',
+      '--cs-accent': '#7c3aed',
+      '--cs-bg': '#eef3f9'
+    },
+    commerce: {
+      '--cs-primary': '#f97316',
+      '--cs-primary-dark': '#ea580c',
+      '--cs-accent': '#ec4899',
+      '--cs-bg': '#fff7ed'
+    },
+    content: {
+      '--cs-primary': '#0f766e',
+      '--cs-primary-dark': '#115e59',
+      '--cs-accent': '#14b8a6',
+      '--cs-bg': '#effaf7'
+    },
+    analytics: {
       '--cs-primary': '#7c3aed',
-      '--cs-accent': '#f59e0b',
-      '--cs-bg': '#0f172a'
+      '--cs-primary-dark': '#6d28d9',
+      '--cs-accent': '#06b6d4',
+      '--cs-bg': '#f5f3ff'
+    },
+    crm: {
+      '--cs-primary': '#db2777',
+      '--cs-primary-dark': '#be185d',
+      '--cs-accent': '#8b5cf6',
+      '--cs-bg': '#fff1f7'
     },
     finance: {
-      '--cs-primary': '#059669',
-      '--cs-accent': '#10b981',
-      '--cs-text': '#064e3b'
+      '--cs-primary': '#047857',
+      '--cs-primary-dark': '#065f46',
+      '--cs-accent': '#f59e0b',
+      '--cs-bg': '#eefbf4'
+    },
+    education: {
+      '--cs-primary': '#7c3aed',
+      '--cs-primary-dark': '#6d28d9',
+      '--cs-accent': '#f97316',
+      '--cs-bg': '#f8f4ff'
     },
     healthcare: {
       '--cs-primary': '#0891b2',
-      '--cs-accent': '#06b6d4',
-      '--cs-bg': '#ecfeff'
+      '--cs-primary-dark': '#0e7490',
+      '--cs-accent': '#10b981',
+      '--cs-bg': '#effcff'
     },
-    education: {
+    logistics: {
       '--cs-primary': '#ea580c',
+      '--cs-primary-dark': '#c2410c',
+      '--cs-accent': '#2563eb',
+      '--cs-bg': '#fff6ed'
+    },
+    developer: {
+      '--cs-primary': '#34d399',
+      '--cs-primary-dark': '#10b981',
+      '--cs-accent': '#60a5fa',
+      '--cs-bg': '#07111f',
+      '--cs-text': '#e5eefc',
+      '--cs-text-muted': '#93a8c8'
+    },
+    hr: {
+      '--cs-primary': '#be185d',
+      '--cs-primary-dark': '#9d174d',
+      '--cs-accent': '#f59e0b',
+      '--cs-bg': '#fff1f7'
+    },
+    manufacturing: {
+      '--cs-primary': '#475569',
+      '--cs-primary-dark': '#334155',
       '--cs-accent': '#f97316',
+      '--cs-bg': '#f1f5f9'
+    },
+    hospitality: {
+      '--cs-primary': '#0d9488',
+      '--cs-primary-dark': '#0f766e',
+      '--cs-accent': '#f59e0b',
+      '--cs-bg': '#f0fdfa'
+    },
+    'real-estate': {
+      '--cs-primary': '#7c2d12',
+      '--cs-primary-dark': '#9a3412',
+      '--cs-accent': '#22c55e',
       '--cs-bg': '#fff7ed'
     },
-    gaming: {
-      '--cs-primary': '#dc2626',
-      '--cs-accent': '#ef4444',
-      '--cs-bg': '#18181b'
+    legal: {
+      '--cs-primary': '#1e3a8a',
+      '--cs-primary-dark': '#1e40af',
+      '--cs-accent': '#a16207',
+      '--cs-bg': '#f8fafc'
     },
-    energy: {
-      '--cs-primary': '#84cc16',
-      '--cs-accent': '#a3e635',
-      '--cs-bg': '#f7fee7'
+    support: {
+      '--cs-primary': '#2563eb',
+      '--cs-primary-dark': '#1d4ed8',
+      '--cs-accent': '#14b8a6',
+      '--cs-bg': '#eff6ff'
+    },
+    'supply-chain': {
+      '--cs-primary': '#0891b2',
+      '--cs-primary-dark': '#0e7490',
+      '--cs-accent': '#eab308',
+      '--cs-bg': '#ecfeff'
+    },
+    research: {
+      '--cs-primary': '#7c3aed',
+      '--cs-primary-dark': '#6d28d9',
+      '--cs-accent': '#06b6d4',
+      '--cs-bg': '#f5f3ff'
+    },
+    security: {
+      '--cs-primary': '#dc2626',
+      '--cs-primary-dark': '#b91c1c',
+      '--cs-accent': '#6366f1',
+      '--cs-bg': '#fef2f2'
+    },
+    retail: {
+      '--cs-primary': '#f97316',
+      '--cs-primary-dark': '#ea580c',
+      '--cs-accent': '#ec4899',
+      '--cs-bg': '#fff7ed'
+    },
+    insurance: {
+      '--cs-primary': '#1e40af',
+      '--cs-primary-dark': '#1e3a8a',
+      '--cs-accent': '#059669',
+      '--cs-bg': '#eff6ff'
+    },
+    ngo: {
+      '--cs-primary': '#be185d',
+      '--cs-primary-dark': '#9d174d',
+      '--cs-accent': '#f59e0b',
+      '--cs-bg': '#fdf2f8'
     },
     telecom: {
       '--cs-primary': '#2563eb',
-      '--cs-accent': '#3b82f6',
+      '--cs-primary-dark': '#1d4ed8',
+      '--cs-accent': '#38bdf8',
       '--cs-bg': '#eff6ff'
+    },
+    energy: {
+      '--cs-primary': '#65a30d',
+      '--cs-primary-dark': '#4d7c0f',
+      '--cs-accent': '#facc15',
+      '--cs-bg': '#f7fee7'
+    },
+    transportation: {
+      '--cs-primary': '#0284c7',
+      '--cs-primary-dark': '#0369a1',
+      '--cs-accent': '#f59e0b',
+      '--cs-bg': '#f0f9ff'
+    },
+    agriculture: {
+      '--cs-primary': '#15803d',
+      '--cs-primary-dark': '#166534',
+      '--cs-accent': '#ca8a04',
+      '--cs-bg': '#f7fdf4'
+    },
+    media: {
+      '--cs-primary': '#9333ea',
+      '--cs-primary-dark': '#7e22ce',
+      '--cs-accent': '#ec4899',
+      '--cs-bg': '#faf5ff'
+    },
+    gaming: {
+      '--cs-primary': '#f43f5e',
+      '--cs-primary-dark': '#e11d48',
+      '--cs-accent': '#a855f7',
+      '--cs-bg': '#18181b',
+      '--cs-text': '#f4f4f5',
+      '--cs-text-muted': '#a1a1aa'
+    },
+    automotive: {
+      '--cs-primary': '#334155',
+      '--cs-primary-dark': '#1e293b',
+      '--cs-accent': '#f97316',
+      '--cs-bg': '#f1f5f9'
+    },
+    pharmaceutical: {
+      '--cs-primary': '#0e7490',
+      '--cs-primary-dark': '#155e75',
+      '--cs-accent': '#22c55e',
+      '--cs-bg': '#ecfeff'
+    },
+    construction: {
+      '--cs-primary': '#b45309',
+      '--cs-primary-dark': '#92400e',
+      '--cs-accent': '#475569',
+      '--cs-bg': '#fffbeb'
+    },
+    aviation: {
+      '--cs-primary': '#1d4ed8',
+      '--cs-primary-dark': '#1e40af',
+      '--cs-accent': '#38bdf8',
+      '--cs-bg': '#f8fafc'
+    },
+    maritime: {
+      '--cs-primary': '#0369a1',
+      '--cs-primary-dark': '#075985',
+      '--cs-accent': '#14b8a6',
+      '--cs-bg': '#f0f9ff'
     },
     government: {
       '--cs-primary': '#1e40af',
-      '--cs-accent': '#3730a3',
-      '--cs-text': '#1e3a8a'
+      '--cs-primary-dark': '#1e3a8a',
+      '--cs-accent': '#b91c1c',
+      '--cs-bg': '#f8fafc'
     }
   };
 
@@ -690,12 +923,15 @@
   }
 
   function exportThemeTokens(root) {
-    var target = getSceneTarget(root) || document.documentElement;
+    // A string argument addresses a scene by name so callers can preview a
+    // theme without mounting a matching DOM subtree first.
+    var sceneName = typeof root === 'string' ? normalizeSceneName(root) : '';
+    var target = sceneName ? (document.body || document.documentElement) : (getSceneTarget(root) || document.documentElement);
     var styles = typeof window.getComputedStyle === 'function' ? window.getComputedStyle(target) : null;
     var tokens = {};
 
     // Get current scene
-    var currentScene = target.getAttribute('data-cs-scene-current');
+    var currentScene = sceneName || target.getAttribute('data-cs-scene-current');
     if (!currentScene && target.classList) {
       for (var i = 0; i < target.classList.length; i++) {
         var cls = target.classList[i];

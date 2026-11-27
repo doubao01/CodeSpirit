@@ -369,15 +369,15 @@ interface CodespiritTheme {
    * Resolves --cs-primary, --cs-accent, --cs-bg, etc. from computed styles.
    * Falls back to framework defaults for any unresolvable values.
    * 
-   * @param root - The scene root element (defaults to document)
+   * @param root - The scene root element, a scene name, or nothing (defaults to document)
    * @returns Map of CSS variable names to values
    */
-  tokens(root?: HTMLElement | Document): CodespiritThemeTokens;
+  tokens(root?: HTMLElement | Document | string): CodespiritThemeTokens;
 
   /**
    * Shorthand alias for {@link CodespiritTheme.tokens}.
    */
-  exportTokens(root?: HTMLElement | Document): CodespiritThemeTokens;
+  exportTokens(root?: HTMLElement | Document | string): CodespiritThemeTokens;
 }
 
 // ===================================================================

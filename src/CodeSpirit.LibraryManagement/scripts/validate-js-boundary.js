@@ -516,6 +516,51 @@ function validateDevPanelAssets() {
   });
 }
 
+function validateDesignTokens() {
+  const workspaceRoot = path.resolve(templateRoot, '../..');
+  const cssFiles = [
+    path.join(workspaceRoot, 'src/CodeSpirit.LibraryManagement/wwwroot/css/site.css'),
+    path.join(workspaceRoot, 'src/Templates/CodeSpiritVsixTemplate/ProjectTemplates/CodeSpirit.LibraryManagement/wwwroot/css/site.css')
+  ];
+  const intentFiles = [
+    path.join(workspaceRoot, 'src/CodeSpirit.LibraryManagement/wwwroot/js/ui/codespirit.intent.js'),
+    path.join(workspaceRoot, 'src/Templates/CodeSpiritVsixTemplate/ProjectTemplates/CodeSpirit.LibraryManagement/wwwroot/js/ui/codespirit.intent.js')
+  ];
+
+  const css = fs.readFileSync(cssFiles[0], 'utf8');
+  const intent = fs.readFileSync(intentFiles[0], 'utf8');
+  assert.strictEqual(css, fs.readFileSync(cssFiles[1], 'utf8'), 'Template site.css must match source');
+  assert.strictEqual(intent, fs.readFileSync(intentFiles[1], 'utf8'), 'Template intent script must match source');
+
+  const defined = new Set((css.match(/--cs-[a-z0-9-]+(?=\s*:)/g) || []));
+  const referenced = new Set((css.match(/var\((--cs-[a-z0-9-]+)/g) || []).map((token) => token.replace('var(', '')));
+  const missing = [...referenced].filter((token) => !defined.has(token));
+  assert.deepStrictEqual(missing, [], `Undefined CSS tokens: ${missing.join(', ')}`);
+
+  const exported = intent.match(/var THEME_TOKEN_NAMES = \[([\s\S]*?)\];/);
+  assert.ok(exported, 'THEME_TOKEN_NAMES must be declared');
+  const exportedTokens = exported[1].match(/--cs-[a-z0-9-]+/g) || [];
+  const defaultBlock = intent.match(/var DEFAULT_THEME_TOKENS = \{([\s\S]*?)\n  \};/);
+  assert.ok(defaultBlock, 'DEFAULT_THEME_TOKENS must be declared');
+  const defaultTokens = new Set(defaultBlock[1].match(/--cs-[a-z0-9-]+(?=['"]?:)/g) || []);
+  exportedTokens.forEach((token) => {
+    assert.ok(css.includes(token + ':'), `Exported token missing from site.css: ${token}`);
+    assert.ok(defaultTokens.has(token), `Exported token missing from DEFAULT_THEME_TOKENS: ${token}`);
+  });
+
+  const sceneClasses = new Set((css.match(/\.cs-scene-([a-z-]+)\s*\{/g) || []).map((rule) => rule.replace(/\.cs-scene-/, '').replace(/\s*\{$/, '')));
+  const sceneNames = new Set((intent.match(/name: '([a-z-]+)'/g) || []).map((entry) => entry.replace(/name: '|'/g, '')));
+  sceneNames.delete('app');
+  const scenesWithoutStyle = [...sceneNames].filter((name) => !sceneClasses.has(name));
+  assert.deepStrictEqual(scenesWithoutStyle, [], `Scenes without a .cs-scene-* style: ${scenesWithoutStyle.join(', ')}`);
+
+  const variantsBlock = intent.match(/var SCENE_THEME_VARIANTS = \{([\s\S]*?)\n  \};/);
+  assert.ok(variantsBlock, 'SCENE_THEME_VARIANTS must be declared');
+  const variantScenes = new Set((variantsBlock[1].match(/^\s{4}'?([a-z-]+)'?: \{/gm) || []).map((line) => line.trim().replace(/^(?:'|)([a-z-]+)(?:'|): \{$/, '$1')));
+  const scenesWithoutVariant = [...sceneNames].filter((name) => !variantScenes.has(name));
+  assert.deepStrictEqual(scenesWithoutVariant, [], `Scenes without a token variant: ${scenesWithoutVariant.join(', ')}`);
+}
+
 function validateRuntimeCompatibilityLayer() {
   const workspaceRoot = path.resolve(templateRoot, '../..');
   const files = [
@@ -1364,6 +1409,7 @@ async function main() {
   validateSnippetCatalog();
   validateTypeDeclarations();
   validateDevPanelAssets();
+  validateDesignTokens();
   validateRuntimeCompatibilityLayer();
   validateTemplateManifest();
 

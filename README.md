@@ -53,7 +53,7 @@ dotnet build src/Templates/CodeSpiritVsixTemplate/CodeSpiritVsixTemplate.csproj 
 | 表达式引擎 | `data-cs-show`、`data-cs-enable`、`data-cs-refresh` | 内置微型表达式引擎，无额外依赖 |
 | 语义布局 | `<cs:Grid>`、`<cs:Card>`、`<cs:Stack>` | 消灭页面级布局 CSS |
 | 复合组件 | `<cs:Crud>`、`<cs:Dashboard>`、`<cs:MetricCard>`、`<cs:ActivityFeed>`、`<cs:QuickLinks>` | 自动生成 CRUD 和大屏 |
-| 场景识别 | `data-cs-scene`、`data-cs-intent` | 24 类通用业务场景自动识别与主题切换 |
+| 场景识别 | `data-cs-scene`、`data-cs-intent` | 36 类通用业务场景自动识别与主题切换 |
 | 内置交互 | `data-cs-confirm`、`data-cs-source`、`cs:Tabs`、`cs:Wizard` | 确认对话框、选项数据源协议、ARIA 标签页/向导与方向键导航 |
 
 ## 最小应用
@@ -190,6 +190,8 @@ ASPX 渲染支持嵌套绑定路径和列表索引，例如 `{Binding User.Profi
 
 内置 UI 原语：`.cs-card`、`.cs-panel`、`.cs-grid`、`.cs-stack`、`.cs-btn`、`.cs-badge`、`.cs-alert`、`.cs-toolbar`、`.cs-tabs`、`.cs-modal`、`.cs-pager`。
 
+所有样式只引用 `site.css` 中的设计 token：品牌、表面、文本、语义色（`--cs-tone-*` 及 `-soft`/`-text`/`-ring`）、形状与阴影、排版与间距六组。场景类只覆盖品牌色和表面色，其余 token 通过 `@supports (color: color-mix(in srgb, ...))` 从主色派生，因此切换场景不会残留上一个主题的焦点环、阴影或表头颜色。完整 token 表与校验规则见 `src/CodeSpirit.LibraryManagement/README.md` 的「默认样式与场景」一节。
+
 ## 场景识别
 
 `wwwroot/js/ui/codespirit.intent.js` 会读取标题、表头、标签、按钮、命令名、placeholder、class、页面标题和路径，为根节点添加场景类。
@@ -220,6 +222,18 @@ ASPX 渲染支持嵌套绑定路径和列表索引，例如 `{Binding User.Profi
 | `cs-scene-retail` | 零售、门店、POS、收银、会员 |
 | `cs-scene-insurance` | 保险、保单、理赔、核保、精算 |
 | `cs-scene-ngo` | 公益、项目、捐赠、志愿者、受益人 |
+| `cs-scene-telecom` | 电信、运营商、套餐、流量、基站 |
+| `cs-scene-energy` | 能源、电力、电网、发电、碳排 |
+| `cs-scene-transportation` | 交通、出行、线路、票务、调度 |
+| `cs-scene-agriculture` | 农业、种植、养殖、农资、收成 |
+| `cs-scene-media` | 媒体、内容分发、节目、编辑、播放 |
+| `cs-scene-gaming` | 游戏、玩家、关卡、道具、战绩 |
+| `cs-scene-automotive` | 汽车、整车、经销商、售后、配件 |
+| `cs-scene-pharmaceutical` | 医药、药品、批号、临床、处方 |
+| `cs-scene-construction` | 建筑、工程、工地、进度、材料 |
+| `cs-scene-aviation` | 航空、航班、机场、机组、行李 |
+| `cs-scene-maritime` | 航运、港口、船舶、集装箱、航线 |
+| `cs-scene-government` | 政府、政务、审批、许可、公共服务 |
 
 显式指定场景：
 
@@ -233,6 +247,7 @@ ASPX 渲染支持嵌套绑定路径和列表索引，例如 `{Binding User.Profi
 
 - 低置信度识别会写入 `data-cs-scene-confidence="low"`、`data-cs-scene-candidate` 和 `data-cs-scene-score`。
 - `CodeSpirit.theme.exportTokens(root)` 可导出当前场景下的 `--cs-*` 主题 token。
+- `CodeSpirit.theme.exportTokens('dashboard')` 传入场景名可离线获取该场景配色（无需先挂载对应 DOM）。
 - `CodeSpirit.theme.tokens(root)` 是同一能力的简写。
 
 ## 无人值守开发

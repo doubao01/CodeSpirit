@@ -17,20 +17,21 @@ body {
 .library-screen {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: var(--cs-space-5);
 }
 
 .screen-hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: var(--cs-space-5);
   min-height: 260px;
-  padding: 2.5rem;
-  border: 1px solid rgba(56, 189, 248, 0.22);
-  border-radius: 28px;
-  background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.36), transparent 32%), radial-gradient(circle at bottom right, rgba(129, 140, 248, 0.24), transparent 30%), linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.72));
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+  padding: var(--cs-space-6);
+  border: 1px solid var(--cs-spotlight-border);
+  border-radius: var(--cs-radius-lg);
+  background: var(--cs-spotlight-bg);
+  box-shadow: var(--cs-spotlight-shadow);
+  color: var(--cs-spotlight-text);
 }
 
 .eyebrow {
@@ -44,6 +45,7 @@ body {
 .screen-hero h1 {
   max-width: 760px;
   margin-top: 0.75rem;
+  color: var(--cs-spotlight-text);
   font-size: clamp(2.6rem, 6vw, 5.8rem);
   line-height: 0.95;
   letter-spacing: -0.07em;
@@ -51,8 +53,8 @@ body {
 
 .subtitle {
   max-width: 720px;
-  margin-top: 1rem;
-  color: var(--cs-text-soft);
+  margin-top: var(--cs-space-4);
+  color: var(--cs-spotlight-text-muted);
   font-size: 1.15rem;
 }
 
@@ -63,10 +65,21 @@ body {
   justify-content: center;
   min-width: 150px;
   padding: 0.9rem 1.2rem;
-  border-radius: 999px;
-  background: var(--cs-primary);
+  border-radius: var(--cs-radius-full);
+  background: linear-gradient(135deg, var(--cs-primary), var(--cs-accent));
   color: var(--cs-text-on-primary);
   font-weight: 800;
+  text-decoration: none;
+  box-shadow: var(--cs-shadow-primary);
+  transition: transform var(--cs-duration) var(--cs-ease),
+    box-shadow var(--cs-duration) var(--cs-ease);
+}
+
+.admin-entry:hover,
+.screen-link:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--cs-shadow-primary-hover);
+  color: var(--cs-text-on-primary);
   text-decoration: none;
 }
 
@@ -108,11 +121,15 @@ body {
   letter-spacing: -0.05em;
 }
 
-.metric-blue { box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.18); }
-.metric-green { box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.18); }
-.metric-amber { box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.18); }
-.metric-purple { box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.18); }
-.metric-red { box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.2); }
+.metric-card {
+  border-top: 3px solid var(--cs-border);
+}
+
+.metric-blue { border-top-color: var(--cs-tone-blue); }
+.metric-green { border-top-color: var(--cs-tone-green); }
+.metric-amber { border-top-color: var(--cs-tone-amber); }
+.metric-purple { border-top-color: var(--cs-tone-purple); }
+.metric-red { border-top-color: var(--cs-tone-red); }
 
 .screen-grid {
   display: grid;
