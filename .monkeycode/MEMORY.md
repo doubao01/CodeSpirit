@@ -47,6 +47,10 @@ Agent 在任务执行过程中发现的条目应遵循以下格式：
   - Release 配置在 Linux 上可完整构建（AOT 项目仅编译）；VSIX 容器只能在 Windows 上生成，Linux 构建只验证编译。
   - GitHub Actions：`ci.yml` 跑 Linux 构建+测试+JS 校验、Windows VSIX、NuGet 打包；`release.yml` 由 `v*` tag 或手动版本触发，产出 4 个 NuGet 包 + VSIX 并创建 GitHub Release。
   - VSIX 模板的 `CodeSpiritVersion` 属性控制包版本，release 工作流会在 Windows 上先改写它再构建 VSIX。
+  - VSIX 工程通过 `CustomAfterMicrosoftCommonTargets` 晚导入 `Microsoft.VsSDK.targets`；必须晚于 `Microsoft.Common.CurrentVersion.targets`，否则 `PrepareForRunDependsOn` 被覆盖，`CreateVsixContainer` 不会执行。
+  - `Microsoft.VSSDK.BuildTools` 的任务程序集是 .NET Framework 4.7.2，只能在 Windows 用 Visual Studio 的 `msbuild` 打包；Linux 上 `dotnet build` 只编译，不生成 `.vsix`。
+  - VSIX 包装工程目标框架为 `net472` 并引用 `Microsoft.NETFramework.ReferenceAssemblies`，这样 VS2022 的 MSBuild 无需 .NET 10 SDK 即可构建；Linux 上同样能编译通过，产物路径为 `bin/Release/net472/`。
+  - VSIX 模板用 `ZipDirectory` 在 `obj/CodeSpiritTemplate` 预打包模板目录，再以 `Content IncludeInVSIX=true VSIXSubPath=ProjectTemplates` 注入容器，manifest 用静态 `Path="ProjectTemplates"`；`PackageProjectTemplate` 挂在 `GetVsixSourceItemsDependsOn` 上，模板文件每次构建都会重新打包。
 
 [PageRenderer 组件属性输出约定]
 - Date: 2026-06-26
